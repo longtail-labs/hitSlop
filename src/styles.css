@@ -1,0 +1,40 @@
+.prompt-node {
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  padding: 0;
+  min-width: 250px;
+}
+
+.prompt-node-header {
+  background-color: #6c5ce7;
+  color: white;
+  padding: 8px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.prompt-node-content {
+  padding: 10px;
+}
+
+.prompt-node label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.prompt-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.flow-wrapper {
+  width: 100%;
+  height: 100vh;
+}

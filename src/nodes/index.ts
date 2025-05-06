@@ -1,6 +1,7 @@
 import type { NodeTypes } from '@xyflow/react';
 
 import { PositionLoggerNode } from './PositionLoggerNode';
+import { PromptNode } from './PromptNode';
 import { AppNode } from './types';
 
 export const initialNodes: AppNode[] = [
@@ -14,13 +15,14 @@ export const initialNodes: AppNode[] = [
   { id: 'c', position: { x: 100, y: 100 }, data: { label: 'your ideas' } },
   {
     id: 'd',
-    type: 'output',
+    type: 'prompt-node',
     position: { x: 0, y: 200 },
-    data: { label: 'with React Flow' },
+    data: { prompt: 'with React Flow' },
   },
 ];
 
 export const nodeTypes = {
   'position-logger': PositionLoggerNode,
+  'prompt-node': PromptNode,
   // Add any of your custom nodes here!
 } satisfies NodeTypes;
