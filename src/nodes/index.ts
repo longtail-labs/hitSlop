@@ -18,7 +18,7 @@ export const initialNodes: AppNode[] = [
     id: 'd',
     type: 'prompt-node',
     position: { x: 0, y: 200 },
-    data: { prompt: 'with React Flow' },
+    data: { prompt: '' },
   },
 ];
 

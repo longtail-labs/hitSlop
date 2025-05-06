@@ -267,7 +267,7 @@ export function PromptNode({ data, id }: NodeProps) {
             value={prompt}
             onChange={handlePromptChange}
             onKeyDown={handleKeyDown}
-            placeholder="Enter a prompt to generate an image..."
+            placeholder="Enter a prompt to gen an image..."
             className="nodrag"
             style={{
               width: '100%',
