@@ -11,6 +11,7 @@ import {
   Panel,
   useReactFlow,
   ReactFlowProvider,
+  SelectionMode,
 } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
@@ -51,6 +52,7 @@ function Flow() {
           type: 'prompt-node',
           position,
           data: { prompt: '' },
+          selectable: false,
         };
 
         // Add the new node to the flow
@@ -72,13 +74,18 @@ function Flow() {
         onConnect={onConnect}
         onPaneClick={onPaneClick}
         fitView
+        panOnScroll
+        selectionOnDrag
+        panActivationKeyCode="Space"
+        selectionMode={SelectionMode.Partial}
+        panOnDrag={false}
       >
         <Background />
         <MiniMap />
         <Controls />
         <Panel position="top-center">
           <h3>AI Image Generator Flow</h3>
-          <p>Click anywhere on the canvas to create a new prompt node</p>
+          <p>Click anywhere on the canvas to create a new prompt node. Press Space + drag to pan.</p>
         </Panel>
       </ReactFlow>
     </div>

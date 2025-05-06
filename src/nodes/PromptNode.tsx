@@ -219,45 +219,29 @@ export function PromptNode({ data, id }: NodeProps) {
           alignItems: 'center',
           marginBottom: '12px'
         }}>
+          <button 
+            onClick={handleDelete}
+            className="nodrag"
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#e53e3e',
+              padding: '2px',
+              borderRadius: '4px',
+              marginRight: '8px'
+            }}
+          >
+            ✕
+          </button>
           <div style={{ 
             fontWeight: 'bold', 
             fontSize: '14px',
-            color: '#4a5568'
+            color: '#333',
+            flexGrow: 1,
+            textAlign: 'center'
           }}>
-            Image Prompt
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={() => setShowOptions(!showOptions)}
-              className="nodrag"
-              style={{
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#718096',
-                padding: '2px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
-              {showOptions ? 'Hide Options' : 'Show Options'}
-            </button>
-            <button 
-              onClick={handleDelete}
-              className="nodrag"
-              style={{
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#e53e3e',
-                padding: '2px',
-                borderRadius: '4px'
-              }}
-            >
-              ✕
-            </button>
+            Prompt
           </div>
         </div>
         
@@ -429,11 +413,29 @@ export function PromptNode({ data, id }: NodeProps) {
         )}
         
         <button 
+          onClick={() => setShowOptions(!showOptions)}
+          className="nodrag"
+          style={{
+            marginTop: '8px',
+            padding: '6px 12px',
+            backgroundColor: '#f8f9fa',
+            color: '#4a5568',
+            border: '1px solid #e2e8f0',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            width: '100%',
+            fontSize: '13px',
+            marginBottom: '8px'
+          }}
+        >
+          {showOptions ? 'Hide Options' : 'Show Options'}
+        </button>
+        
+        <button 
           onClick={handleGenerate}
           className="nodrag"
           disabled={isGenerating}
           style={{
-            marginTop: '8px',
             padding: '6px 12px',
             backgroundColor: isGenerating ? '#a29bfe' : '#6c5ce7',
             color: 'white',
@@ -456,3 +458,6 @@ export function PromptNode({ data, id }: NodeProps) {
     </div>
   );
 }
+
+// Make this node non-selectable
+PromptNode.selectable = false;

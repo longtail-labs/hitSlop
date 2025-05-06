@@ -19,6 +19,7 @@ export const initialNodes: AppNode[] = [
     type: 'prompt-node',
     position: { x: 0, y: 200 },
     data: { prompt: '' },
+    selectable: false,
   },
 ];
 
