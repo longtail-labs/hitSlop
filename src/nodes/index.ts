@@ -2,6 +2,7 @@ import type { NodeTypes } from '@xyflow/react';
 
 import { PositionLoggerNode } from './PositionLoggerNode';
 import { PromptNode } from './PromptNode';
+import { ImageNode } from './ImageNode';
 import { AppNode } from './types';
 
 export const initialNodes: AppNode[] = [
@@ -24,5 +25,6 @@ export const initialNodes: AppNode[] = [
 export const nodeTypes = {
   'position-logger': PositionLoggerNode,
   'prompt-node': PromptNode,
+  'image-node': ImageNode,
   // Add any of your custom nodes here!
 } satisfies NodeTypes;
