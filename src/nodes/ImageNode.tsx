@@ -1,6 +1,18 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 export function ImageNode({ data }: NodeProps) {
+  const handleDownload = () => {
+    if (data?.imageUrl) {
+      // Create a temporary anchor element
+      const link = document.createElement('a');
+      link.href = data.imageUrl as string;
+      link.download = `ai-generated-image-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
     <div className="react-flow__node-default image-node">
       <div className="image-node-header">Generated Image</div>
@@ -36,15 +48,41 @@ export function ImageNode({ data }: NodeProps) {
             `}</style>
           </div>
         ) : data?.imageUrl ? (
-          <img 
-            src={data.imageUrl as string} 
-            alt="Generated AI image" 
-            style={{ 
-              maxWidth: '100%', 
-              borderRadius: '4px',
-              display: 'block'
-            }} 
-          />
+          <div style={{ position: 'relative' }}>
+            <img 
+              src={data.imageUrl as string} 
+              alt="Generated AI image" 
+              style={{ 
+                maxWidth: '100%', 
+                borderRadius: '4px',
+                display: 'block'
+              }} 
+            />
+            <button 
+              onClick={handleDownload}
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '5px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.12)'
+              }}
+              title="Download image"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 16L12 8" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9 13L12 16L15 13" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M20 16V18C20 19.1046 19.1046 20 18 20H6C4.89543 20 4 19.1046 4 18V16" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
         ) : data?.error ? (
           <div className="image-error" style={{
             padding: '20px',
