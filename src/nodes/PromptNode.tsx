@@ -1,9 +1,32 @@
-import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
+import {
+  Handle,
+  Position,
+  type NodeProps,
+  useReactFlow,
+  NodeChange,
+} from '@xyflow/react';
 import { useCallback, useRef, useEffect, useState, KeyboardEvent } from 'react';
 import { processImageOperation } from '../services/imageGenerationService';
 import { AppNode, ImageNodeData } from './types';
+import { BaseNode } from '@/components/base-node';
+import {
+  NodeHeader,
+  NodeHeaderTitle,
+  NodeHeaderIcon,
+  NodeHeaderActions,
+  NodeHeaderDeleteAction,
+} from '@/components/node-header';
+import { ImageIcon, Upload, X, Lock } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
-export function PromptNode({ data, id }: NodeProps) {
+export function PromptNode({ data, id, selected }: NodeProps) {
   const reactFlowInstance = useReactFlow();
   const {
     deleteElements,
@@ -12,6 +35,7 @@ export function PromptNode({ data, id }: NodeProps) {
     setNodes,
     getNode,
     getIntersectingNodes,
+    fitView,
   } = reactFlowInstance;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -21,7 +45,7 @@ export function PromptNode({ data, id }: NodeProps) {
   );
   const [n, setN] = useState<number>((data?.n as number) || 1);
   const [quality, setQuality] = useState<string>(
-    (data?.quality as string) || 'auto',
+    (data?.quality as string) || 'low',
   );
   const [outputFormat, setOutputFormat] = useState<string>(
     (data?.outputFormat as string) || 'png',
@@ -37,9 +61,34 @@ export function PromptNode({ data, id }: NodeProps) {
   const [sourceImages, setSourceImages] = useState<string[]>(
     (data?.sourceImages as string[]) || [],
   );
+  const [nodesToFocus, setNodesToFocus] = useState<string[]>([]);
 
   // Node dimensions for collision detection
   const IMAGE_NODE_DIMENSIONS = { width: 300, height: 300 };
+
+  // Focus on a node when it's created
+  // We need to track the last created node and focus on it
+  // This effect will run whenever nodesToFocus changes
+  useEffect(() => {
+    if (nodesToFocus.length > 0) {
+      // Set up a timer to focus on the node
+      // This gives time for the node to be added to the flow
+      const timer = setTimeout(() => {
+        nodesToFocus.forEach((nodeId) => {
+          fitView({
+            nodes: [{ id: nodeId }],
+            duration: 500,
+            padding: 1.8, // Increased padding to show more context around the node
+            maxZoom: 0.8, // Limit max zoom to prevent excessive zooming
+          });
+        });
+        // Clear the focus list after focusing
+        setNodesToFocus([]);
+      }, 100); // Small delay to ensure node is rendered
+
+      return () => clearTimeout(timer);
+    }
+  }, [nodesToFocus, fitView]);
 
   // Find a non-overlapping position for new image nodes
   const findNonOverlappingPosition = useCallback(
@@ -172,9 +221,12 @@ export function PromptNode({ data, id }: NodeProps) {
       // Create placeholder nodes for each image to be generated
       const loadingImageNodes: AppNode[] = [];
       const numImages = n;
+      const newNodeIds: string[] = [];
 
       for (let i = 0; i < numImages; i++) {
         const imageNodeId = `image-node-${Date.now()}-${i}`;
+        newNodeIds.push(imageNodeId);
+
         // Find a non-overlapping position for this image node
         const nonOverlappingPosition = findNonOverlappingPosition(
           basePosition,
@@ -205,6 +257,9 @@ export function PromptNode({ data, id }: NodeProps) {
           targetHandle: 'input',
         });
       }
+
+      // Add the new nodes to the focus list
+      setNodesToFocus(newNodeIds);
 
       // Determine if this is a generation or edit operation based on whether we have source images
       const isEditOperation = sourceImages.length > 0;
@@ -315,317 +370,228 @@ export function PromptNode({ data, id }: NodeProps) {
 
   const isEditMode = sourceImages.length > 0;
 
+  // Size options mapping for display
+  const sizeOptions = {
+    '1024x1024': '1024²',
+    '1536x1024': '1536×1024',
+    '1024x1536': '1024×1536',
+  };
+
+  // Dropdown label formatting helper
+  const formatDropdownLabel = (value: string) => {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  };
+
   return (
-    <div
-      className="react-flow__node-default prompt-node"
-      style={{
-        width: '420px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-        backgroundColor: '#ffffff',
-        border: '1px solid #e0e0e0',
-        color: '#333333',
-      }}
-    >
-      <div style={{ padding: '8px' }}>
-        <Handle type="target" position={Position.Top} id="input" />
+    <div>
+      <Handle type="target" position={Position.Top} id="input" />
+      <BaseNode selected={selected} className="prompt-node p-0">
+        <NodeHeader className="border-b">
+          <NodeHeaderIcon>
+            <ImageIcon size={18} />
+          </NodeHeaderIcon>
+          <NodeHeaderTitle>
+            {isEditMode ? 'Edit Image' : 'Generate Image'}
+          </NodeHeaderTitle>
+          <NodeHeaderActions>
+            <NodeHeaderDeleteAction />
+          </NodeHeaderActions>
+        </NodeHeader>
 
-        {/* Top toolbar with options */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '8px',
-            gap: '6px',
-          }}
-        >
-          {/* Left: Close button */}
-          <button
-            onClick={handleDelete}
-            className="nodrag"
-            style={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#f44336',
-              padding: '0px 4px',
-              fontSize: '14px',
-              lineHeight: 1,
-            }}
-          >
-            ✕
-          </button>
-
+        <div className="p-3">
           {/* Options in a row */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '5px',
-              flexGrow: 1,
-              justifyContent: 'flex-start',
-            }}
-          >
-            {/* Size Option */}
-            <select
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-              className="nodrag prompt-option-select"
-              style={{
-                padding: '3px 6px',
-                fontSize: '13px',
-                backgroundColor: '#f5f5f5',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
-                color: '#333',
-              }}
-            >
-              <option value="1024x1024">1024²</option>
-              <option value="1536x1024">1536×1024</option>
-              <option value="1024x1536">1024×1536</option>
-            </select>
-
-            {/* Quality Option */}
-            <select
-              value={quality}
-              onChange={(e) => setQuality(e.target.value)}
-              className="nodrag prompt-option-select"
-              style={{
-                padding: '3px 6px',
-                fontSize: '13px',
-                backgroundColor: '#f5f5f5',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
-                color: '#333',
-              }}
-            >
-              {/* <option value="auto">Quality</option> */}
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-
-            {/* Number Option */}
-            <select
-              value={n}
-              onChange={(e) => setN(parseInt(e.target.value))}
-              className="nodrag prompt-option-select"
-              style={{
-                padding: '3px 6px',
-                fontSize: '13px',
-                backgroundColor: '#f5f5f5',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
-                color: '#333',
-              }}
-            >
-              <option value="1">1 img</option>
-              <option value="2">2 imgs</option>
-              <option value="4">4 imgs</option>
-              <option value="9">9 imgs</option>
-            </select>
-
-            {/* Background Option */}
-            <select
-              value={background}
-              onChange={(e) => setBackground(e.target.value)}
-              className="nodrag prompt-option-select"
-              style={{
-                padding: '3px 6px',
-                fontSize: '13px',
-                backgroundColor: '#f5f5f5',
-                border: '1px solid #e0e0e0',
-                borderRadius: '4px',
-                color: '#333',
-              }}
-            >
-              <option value="opaque">Opaque</option>
-              <option value="transparent">Transparent</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Main Prompt Input with buttons inside */}
-        <div
-          style={{
-            position: 'relative',
-            marginBottom: sourceImages.length > 0 ? '8px' : '0',
-          }}
-        >
-          <textarea
-            ref={textareaRef}
-            value={prompt}
-            onChange={handlePromptChange}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isEditMode ? 'Edit this image...' : 'Create an image...'
-            }
-            className="nodrag ai-prompt-input"
-            style={{
-              width: '100%',
-              padding: '10px',
-              height: '100px',
-              maxHeight: '100px',
-              minHeight: '100px',
-              borderRadius: '6px',
-              border: '1px solid #e0e0e0',
-              backgroundColor: '#f5f5f5',
-              fontSize: '14px',
-              color: '#333',
-              resize: 'none',
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onWheelCapture={(e) => {
-              e.stopPropagation();
-            }}
-          />
-
-          {/* Upload Image Button (Top Right Inside Input) */}
-          <label
-            htmlFor="image-upload"
-            className="nodrag"
-            style={{
-              position: 'absolute',
-              right: '10px',
-              top: '10px',
-              cursor: 'pointer',
-              color: '#9e9e9e',
-              fontSize: '16px',
-            }}
-          >
-            📎
-          </label>
-          <input
-            id="image-upload"
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={handleImageUpload}
-            multiple
-            className="nodrag"
-            style={{ display: 'none' }}
-          />
-
-          {/* Generate Button (Bottom Right Inside Input) */}
-          <button
-            onClick={handleProcess}
-            className="nodrag"
-            disabled={isProcessing}
-            title={
-              isProcessing
-                ? 'Processing...'
-                : isEditMode
-                ? 'Edit image'
-                : 'Generate image'
-            }
-            style={{
-              position: 'absolute',
-              right: '10px',
-              bottom: '10px',
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '4px',
-              backgroundColor: '#4285f4',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '14px',
-              padding: 0,
-            }}
-          >
-            {isProcessing ? '⏳' : '▶'}
-          </button>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div
-            style={{ color: '#f44336', fontSize: '12px', marginBottom: '8px' }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Source Images Display (Below Text Input) */}
-        {sourceImages.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '6px',
-              backgroundColor: '#f5f5f5',
-              padding: '6px',
-              borderRadius: '4px',
-            }}
-          >
-            {sourceImages.map((img, index) => (
-              <div
-                key={index}
-                style={{
-                  position: 'relative',
-                  width: '50px',
-                  height: '50px',
-                }}
-              >
-                <img
-                  src={img}
-                  alt={`Selected ${index}`}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    borderRadius: '4px',
-                  }}
-                />
-                <button
-                  onClick={() => handleRemoveImage(index)}
-                  className="nodrag"
-                  style={{
-                    position: 'absolute',
-                    top: '-5px',
-                    right: '-5px',
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    backgroundColor: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    fontSize: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
+          <div className="flex gap-2 mb-2">
+            {/* Size Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
                 >
-                  ✕
-                </button>
-              </div>
-            ))}
-            {sourceImages.length > 0 && (
-              <button
-                onClick={clearImages}
-                className="nodrag"
-                style={{
-                  backgroundColor: '#e0e0e0',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#333',
-                  padding: '1px 4px',
-                  borderRadius: '3px',
-                  fontSize: '10px',
-                  alignSelf: 'flex-start',
-                }}
-              >
-                Clear
-              </button>
-            )}
+                  {sizeOptions[size as keyof typeof sizeOptions]}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {Object.entries(sizeOptions).map(([value, label]) => (
+                  <DropdownMenuItem
+                    key={value}
+                    onClick={() => setSize(value)}
+                    className={size === value ? 'bg-accent' : ''}
+                  >
+                    {label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Quality Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
+                >
+                  {formatDropdownLabel(quality)}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem
+                  onClick={() => setQuality('low')}
+                  className={quality === 'low' ? 'bg-accent' : ''}
+                >
+                  Low
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setQuality('medium')}
+                  className={quality === 'medium' ? 'bg-accent' : ''}
+                >
+                  Medium
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setQuality('high')}
+                  className={quality === 'high' ? 'bg-accent' : ''}
+                >
+                  <div className="flex items-center gap-1">
+                    High
+                    <Lock size={14} />
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Number of Images Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
+                >
+                  {n} {n === 1 ? 'img' : 'imgs'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                  <DropdownMenuItem
+                    key={num}
+                    onClick={() => setN(num)}
+                    className={n === num ? 'bg-accent' : ''}
+                  >
+                    {num} {num === 1 ? 'img' : 'imgs'}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Background Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
+                >
+                  {formatDropdownLabel(background)}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem
+                  onClick={() => setBackground('opaque')}
+                  className={background === 'opaque' ? 'bg-accent' : ''}
+                >
+                  Opaque
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setBackground('transparent')}
+                  className={background === 'transparent' ? 'bg-accent' : ''}
+                >
+                  Transparent
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        )}
-      </div>
+
+          {/* Main Prompt Input with buttons inside */}
+          <div className="relative mb-2">
+            <textarea
+              ref={textareaRef}
+              value={prompt}
+              onChange={handlePromptChange}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isEditMode ? 'Edit this image...' : 'Create an image...'
+              }
+              className="nodrag w-full p-2 h-24 min-h-24 max-h-24 rounded border border-input bg-background resize-none"
+              onClick={(e) => e.stopPropagation()}
+              onWheelCapture={(e) => {
+                e.stopPropagation();
+              }}
+            />
+
+            {/* Upload Image Button */}
+            <label
+              htmlFor={`image-upload-${id}`}
+              className="nodrag absolute right-2 top-2 cursor-pointer text-muted-foreground hover:text-foreground"
+            >
+              <Upload size={16} />
+            </label>
+            <input
+              id={`image-upload-${id}`}
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleImageUpload}
+              multiple
+              className="nodrag hidden"
+            />
+
+            {/* Generate Button */}
+            <button
+              onClick={handleProcess}
+              className="nodrag absolute right-2 bottom-2 w-7 h-7 flex items-center justify-center rounded bg-primary text-primary-foreground"
+              title={isEditMode ? 'Edit image' : 'Generate image'}
+            >
+              ▶
+            </button>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="text-sm text-destructive mb-2">{error}</div>
+          )}
+
+          {/* Source Images Display */}
+          {sourceImages.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 bg-muted p-1.5 rounded">
+              {sourceImages.map((img, index) => (
+                <div key={index} className="relative w-12 h-12">
+                  <img
+                    src={img}
+                    alt={`Selected ${index}`}
+                    className="w-full h-full object-cover rounded"
+                  />
+                  <button
+                    onClick={() => handleRemoveImage(index)}
+                    className="nodrag absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+              {sourceImages.length > 0 && (
+                <button
+                  onClick={clearImages}
+                  className="nodrag bg-muted-foreground/20 border-none cursor-pointer text-muted-foreground px-1.5 py-0.5 rounded text-xs self-start"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </BaseNode>
       <Handle type="source" position={Position.Bottom} id="output" />
     </div>
   );

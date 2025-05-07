@@ -1,11 +1,50 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
+import { useState, useCallback } from 'react';
+import { BaseNode } from '@/components/base-node';
+import {
+  NodeHeader,
+  NodeHeaderTitle,
+  NodeHeaderIcon,
+  NodeHeaderActions,
+  NodeHeaderDeleteAction,
+} from '@/components/node-header';
+import { ImageIcon, Download, Maximize, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
-export function ImageNode({ data }: NodeProps) {
+// Define the expected data structure
+interface ImageNodeData {
+  imageUrl?: string;
+  isLoading?: boolean;
+  error?: string;
+  prompt?: string;
+}
+
+export function ImageNode({ data, selected, id }: NodeProps) {
+  // Cast data to expected type
+  const nodeData = data as ImageNodeData;
+  const reactFlowInstance = useReactFlow();
+  const {
+    addNodes,
+    addEdges,
+    getNode,
+    getNodes,
+    getIntersectingNodes,
+    fitView,
+    setNodes,
+  } = reactFlowInstance;
+  const [isDoubleClicking, setIsDoubleClicking] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   const handleDownload = () => {
-    if (data?.imageUrl) {
+    if (nodeData.imageUrl) {
       // Create a temporary anchor element
       const link = document.createElement('a');
-      link.href = data.imageUrl as string;
+      link.href = nodeData.imageUrl;
       link.download = `ai-generated-image-${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
@@ -13,167 +52,231 @@ export function ImageNode({ data }: NodeProps) {
     }
   };
 
+  // Find a non-overlapping position for a new node
+  const findNonOverlappingPosition = useCallback(
+    (
+      initialPosition: { x: number; y: number },
+      dimensions = { width: 300, height: 250 },
+    ) => {
+      let position = { ...initialPosition };
+      let tempNode = {
+        id: 'temp',
+        position,
+        width: dimensions.width,
+        height: dimensions.height,
+      };
+
+      // Check if the position causes overlap
+      let intersections = getIntersectingNodes(tempNode);
+
+      // If there are intersections, try to find a better position
+      if (intersections.length > 0) {
+        // Try different positions in a spiral pattern
+        const spiralStep = 100;
+        let attempts = 0;
+        let angle = 0;
+        let radius = spiralStep;
+
+        while (intersections.length > 0 && attempts < 50) {
+          // Move in a spiral pattern
+          angle += 0.5;
+          radius = spiralStep * (1 + angle / 10);
+
+          position = {
+            x: initialPosition.x + radius * Math.cos(angle),
+            y: initialPosition.y + radius * Math.sin(angle),
+          };
+
+          tempNode = { ...tempNode, position };
+          intersections = getIntersectingNodes(tempNode);
+          attempts++;
+        }
+      }
+
+      return position;
+    },
+    [getIntersectingNodes],
+  );
+
+  const handleDoubleClick = useCallback(() => {
+    if (!nodeData.imageUrl || isDoubleClicking) return;
+
+    setIsDoubleClicking(true);
+
+    // Get the current node position
+    const currentNode = getNode(id);
+    if (!currentNode) {
+      setIsDoubleClicking(false);
+      return;
+    }
+
+    // Create base position for new node (below the current node)
+    const initialPosition = {
+      x: currentNode.position.x,
+      y: currentNode.position.y + 350, // Place it below with spacing
+    };
+
+    // Find a non-overlapping position
+    const newPosition = findNonOverlappingPosition(initialPosition);
+
+    // Generate a unique ID with timestamp to avoid conflicts
+    const newNodeId = `prompt-node-${Date.now()}`;
+
+    // Create a new prompt node with the current image as source
+    const newNode = {
+      id: newNodeId,
+      type: 'prompt-node',
+      position: newPosition,
+      data: {
+        prompt: '',
+        sourceImages: [nodeData.imageUrl],
+      },
+      selectable: false,
+    };
+
+    // Add the new node to the flow
+    addNodes(newNode);
+
+    // Create an edge connecting the image node to the new prompt node
+    addEdges({
+      id: `edge-${id}-to-${newNodeId}`,
+      source: id,
+      target: newNodeId,
+      sourceHandle: 'output',
+      targetHandle: 'input',
+    });
+
+    // Focus on the newly created node
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: newNodeId }],
+        duration: 500,
+        padding: 1.8,
+        maxZoom: 0.8,
+      });
+    }, 100);
+
+    setIsDoubleClicking(false);
+  }, [
+    id,
+    nodeData.imageUrl,
+    addNodes,
+    addEdges,
+    getNode,
+    isDoubleClicking,
+    findNonOverlappingPosition,
+    fitView,
+  ]);
+
+  // Determine status class
+  let statusClass = '';
+  if (nodeData.isLoading) {
+    statusClass = 'animate-pulse';
+  } else if (nodeData.error) {
+    statusClass = 'border-2 border-destructive';
+  } else if (nodeData.imageUrl) {
+    statusClass = 'border-2 border-green-500';
+  }
+
   return (
-    <div
-      className="react-flow__node-default image-node"
-      style={{
-        transition: 'all 0.3s ease-in-out', // Add smooth transition for position changes
-        boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)',
-        borderRadius: '8px',
-        border: '1px solid #e2e8f0',
-        background: 'white',
-      }}
-    >
-      <div
-        className="image-node-header"
-        style={{
-          padding: '10px',
-          borderBottom: '1px solid #e2e8f0',
-          fontWeight: 'bold',
-          fontSize: '14px',
-          textAlign: 'center',
-          color: '#333',
-        }}
-      >
-        Generated Image
-      </div>
-      <div className="image-node-content">
-        {data?.isLoading ? (
-          <div
-            className="image-loading"
-            style={{
-              padding: '20px',
-              textAlign: 'center',
-              minHeight: '150px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <div
-              className="spinner"
-              style={{
-                width: '40px',
-                height: '40px',
-                border: '4px solid rgba(0, 0, 0, 0.1)',
-                borderRadius: '50%',
-                borderTop: '4px solid #6c5ce7',
-                animation: 'spin 1s linear infinite',
-                marginBottom: '10px',
-              }}
-            ></div>
-            <div>Generating image...</div>
-            <div style={{ fontSize: '12px', marginTop: '5px', color: '#666' }}>
-              {data?.prompt
-                ? `"${(data.prompt as string).substring(0, 50)}${
-                    (data.prompt as string).length > 50 ? '...' : ''
-                  }"`
-                : ''}
-            </div>
-            <style>{`
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}</style>
-          </div>
-        ) : data?.imageUrl ? (
-          <div style={{ position: 'relative' }}>
-            <img
-              src={data.imageUrl as string}
-              alt="Generated AI image"
-              style={{
-                maxWidth: '100%',
-                borderRadius: '4px',
-                display: 'block',
-              }}
-            />
-            <button
-              onClick={handleDownload}
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '5px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-              }}
-              title="Download image"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12 16L12 8"
-                  stroke="#000"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M9 13L12 16L15 13"
-                  stroke="#000"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M20 16V18C20 19.1046 19.1046 20 18 20H6C4.89543 20 4 19.1046 4 18V16"
-                  stroke="#000"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </div>
-        ) : data?.error ? (
-          <div
-            className="image-error"
-            style={{
-              padding: '20px',
-              textAlign: 'center',
-              backgroundColor: '#fff0f0',
-              borderRadius: '4px',
-              color: '#e74c3c',
-              minHeight: '100px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-            }}
-          >
-            <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-              Generation Failed
-            </div>
-            <div style={{ fontSize: '12px' }}>{data.error as string}</div>
-          </div>
-        ) : (
-          <div
-            className="image-placeholder"
-            style={{
-              padding: '20px',
-              textAlign: 'center',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '4px',
-              color: '#666',
-            }}
-          >
-            Image failed to load
-          </div>
-        )}
-      </div>
+    <div>
       <Handle type="target" position={Position.Top} id="input" />
+      <BaseNode
+        selected={selected}
+        className={`image-node p-0 w-[300px] ${statusClass}`}
+        onDoubleClick={handleDoubleClick}
+      >
+        <NodeHeader className="border-b">
+          <NodeHeaderIcon>
+            <ImageIcon size={18} />
+          </NodeHeaderIcon>
+          <NodeHeaderTitle>Generated Image</NodeHeaderTitle>
+          <NodeHeaderActions>
+            {nodeData.imageUrl && (
+              <>
+                <button
+                  onClick={() => setIsDialogOpen(true)}
+                  className="nodrag flex items-center justify-center rounded-sm p-1 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent"
+                  title="Expand image"
+                >
+                  <Maximize size={14} />
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="nodrag flex items-center justify-center rounded-sm p-1 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-accent"
+                  title="Download image"
+                >
+                  <Download size={14} />
+                </button>
+              </>
+            )}
+            <NodeHeaderDeleteAction />
+          </NodeHeaderActions>
+        </NodeHeader>
+
+        <div className="image-node-content" onDoubleClick={handleDoubleClick}>
+          {nodeData.isLoading ? (
+            <div className="p-5 text-center min-h-[150px] flex flex-col justify-center items-center">
+              <div className="rounded-full bg-blue-500/20 w-10 h-10 mb-3 animate-spin border-2 border-blue-500 border-t-transparent"></div>
+              <div className="text-sm text-muted-foreground">
+                Generating image...
+              </div>
+              <div className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis">
+                {nodeData.prompt
+                  ? `"${String(nodeData.prompt).substring(0, 50)}${
+                      String(nodeData.prompt).length > 50 ? '...' : ''
+                    }"`
+                  : ''}
+              </div>
+            </div>
+          ) : nodeData.imageUrl ? (
+            <div>
+              <img
+                src={nodeData.imageUrl}
+                alt="Generated AI image"
+                className="max-w-full rounded"
+              />
+            </div>
+          ) : nodeData.error ? (
+            <div className="p-5 text-center bg-destructive/10 rounded-sm m-2 text-destructive min-h-[100px] flex flex-col justify-center">
+              <div className="font-medium mb-1">Generation Failed</div>
+              <div className="text-xs">{nodeData.error}</div>
+            </div>
+          ) : (
+            <div className="p-5 text-center bg-muted rounded m-2 text-muted-foreground">
+              Image failed to load
+            </div>
+          )}
+        </div>
+      </BaseNode>
+      <Handle type="source" position={Position.Bottom} id="output" />
+
+      {/* Fullscreen Image Dialog */}
+      {nodeData.imageUrl && (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-[90vw] max-h-[90vh] p-0">
+            <DialogHeader className="p-4 flex-row items-center justify-between border-b">
+              <DialogTitle>Image Preview</DialogTitle>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownload}
+                  className="flex items-center justify-center rounded-sm p-1.5 h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+                  title="Download image"
+                >
+                  <Download size={18} />
+                </button>
+              </div>
+            </DialogHeader>
+            <div className="overflow-hidden p-4 flex items-center justify-center h-[calc(90vh-120px)]">
+              <img
+                src={nodeData.imageUrl}
+                alt="Generated AI image (full size)"
+                className="object-contain w-auto h-auto max-w-[calc(90vw-32px)] max-h-[calc(90vh-140px)]"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

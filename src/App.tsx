@@ -21,9 +21,26 @@ import '@xyflow/react/dist/style.css';
 import { initialNodes, nodeTypes } from './nodes';
 import { initialEdges, edgeTypes } from './edges';
 import { AppNode, ImageNodeData } from './nodes/types';
+import { ArrowDown } from 'lucide-react';
+
+// Import annotation node components
+import {
+  AnnotationNode,
+  AnnotationNodeContent,
+  AnnotationNodeIcon,
+} from '@/components/annotation-node';
 
 // Add some custom styles for our prompt nodes
 import './styles.css';
+
+// Add global styles for monospace font
+const globalStyle = document.createElement('style');
+globalStyle.innerHTML = `
+  .react-flow, .react-flow__node, .react-flow__controls, .react-flow__panel, button, input {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;
+  }
+`;
+document.head.appendChild(globalStyle);
 
 let nodeId = 0;
 
@@ -33,11 +50,46 @@ const NODE_DIMENSIONS = {
   'image-node': { width: 300, height: 300 },
 };
 
+// Create an annotation node component
+function InstructionAnnotation() {
+  return (
+    <AnnotationNode>
+      <AnnotationNodeContent>
+        Click anywhere on the canvas to create a new prompt node. Double-click
+        on an image to edit it, or select and drag multiple images to edit them
+        together.
+      </AnnotationNodeContent>
+      <AnnotationNodeIcon>
+        <ArrowDown />
+      </AnnotationNodeIcon>
+    </AnnotationNode>
+  );
+}
+
+// Define instruction annotation node type
+const customNodeTypes = {
+  ...nodeTypes,
+  'annotation-node': InstructionAnnotation,
+};
+
+// Add initial annotation node pointing to a prompt node
+const instructionalNodes = [
+  // Keep existing initial nodes
+  ...initialNodes,
+  // Add an annotation node
+  {
+    id: 'instruction-annotation',
+    type: 'annotation-node',
+    position: { x: 50, y: -100 },
+    data: {},
+  },
+];
+
 function Flow() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState(instructionalNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { screenToFlowPosition, getNodes, getIntersectingNodes } =
+  const { screenToFlowPosition, getNodes, getIntersectingNodes, fitView } =
     useReactFlow();
   const [selectedImageNodes, setSelectedImageNodes] = useState<AppNode[]>([]);
   const [previousSelectionCount, setPreviousSelectionCount] = useState(0);
@@ -115,9 +167,12 @@ function Flow() {
           'prompt-node',
         );
 
+        // Generate a unique ID with timestamp to avoid conflicts
+        const newNodeId = `prompt-node-${nodeId++}`;
+
         // Create a new node at the non-overlapping position
         const newNode: AppNode = {
-          id: `prompt-node-${nodeId++}`,
+          id: newNodeId,
           type: 'prompt-node',
           position: nonOverlappingPosition,
           data: {
@@ -128,9 +183,19 @@ function Flow() {
 
         // Add the new node to the flow
         setNodes((nds) => [...nds, newNode]);
+
+        // Focus directly on the new node with the same parameters as in ImageNode.tsx
+        setTimeout(() => {
+          fitView({
+            nodes: [{ id: newNodeId }],
+            duration: 500,
+            padding: 1.8,
+            maxZoom: 0.8,
+          });
+        }, 100);
       }
     },
-    [screenToFlowPosition, setNodes, findNonOverlappingPosition],
+    [screenToFlowPosition, setNodes, findNonOverlappingPosition, fitView],
   );
 
   const onSelectionChange = useCallback(
@@ -183,8 +248,9 @@ function Flow() {
     if (selectedImages.length === 0) return;
 
     // Create a new edit node
+    const newNodeId = `prompt-node-${nodeId++}`;
     const newNode: AppNode = {
-      id: `prompt-node-${nodeId++}`,
+      id: newNodeId,
       type: 'prompt-node',
       position: nonOverlappingPosition,
       data: {
@@ -199,15 +265,31 @@ function Flow() {
 
     // Create edges connecting each selected image node to the new edit node
     const newEdges = selectedImageNodes.map((imageNode) => ({
-      id: `edge-${imageNode.id}-to-${newNode.id}`,
+      id: `edge-${imageNode.id}-to-${newNodeId}`,
       source: imageNode.id,
-      target: newNode.id,
+      target: newNodeId,
       sourceHandle: 'output',
       targetHandle: 'input',
     }));
 
     setEdges((edges) => [...edges, ...newEdges]);
-  }, [selectedImageNodes, setNodes, setEdges, findNonOverlappingPosition]);
+
+    // Focus directly on the new node with the same parameters as in ImageNode.tsx
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: newNodeId }],
+        duration: 500,
+        padding: 1.8,
+        maxZoom: 0.8,
+      });
+    }, 100);
+  }, [
+    selectedImageNodes,
+    setNodes,
+    setEdges,
+    findNonOverlappingPosition,
+    fitView,
+  ]);
 
   // Handle mouse up to detect when selection is finished
   useEffect(() => {
@@ -235,7 +317,7 @@ function Flow() {
     >
       <ReactFlow
         nodes={nodes}
-        nodeTypes={nodeTypes}
+        nodeTypes={customNodeTypes}
         onNodesChange={onNodesChange}
         edges={edges}
         edgeTypes={edgeTypes}
@@ -244,6 +326,12 @@ function Flow() {
         onPaneClick={onPaneClick}
         onSelectionChange={onSelectionChange}
         fitView
+        minZoom={0.25}
+        fitViewOptions={{
+          padding: 1.0, // Value from 0-1 represents percentage of the viewport
+          minZoom: 0.01,
+          maxZoom: 1.5,
+        }}
         panOnScroll
         selectionOnDrag
         panActivationKeyCode="Space"
@@ -251,14 +339,12 @@ function Flow() {
         panOnDrag={false}
       >
         <Background />
-        <MiniMap />
+        <MiniMap pannable zoomable />
         <Controls />
-        <Panel position="top-center">
-          <h3>AI Image Generator Flow</h3>
-          <p>
-            Click anywhere on the canvas to create a new prompt node. Press
-            Space + drag to pan.
-          </p>
+        <Panel position="top-left">
+          <h1>hitSlop</h1>
+          <h3>Cursor for designing,</h3>
+          <p>using OpenAI's new Image gen API</p>
         </Panel>
       </ReactFlow>
     </div>

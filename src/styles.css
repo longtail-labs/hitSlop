@@ -31,7 +31,7 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   resize: vertical;
-  font-family: inherit;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 }
 
 /* Adding styles for the ai prompt input */
@@ -41,6 +41,7 @@
   overflow-y: auto !important;
   line-height: 1.5;
   box-sizing: border-box;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 }
 
 /* Styles for option controls */
@@ -82,4 +83,10 @@
 .flow-wrapper {
   width: 100%;
   height: 100vh;
+}
+
+/* Header styles */
+h1 {
+  font-size: 28px;
+  font-weight: 600;
 }
