@@ -5,8 +5,15 @@ import { AppNode, ImageNodeData } from './types';
 
 export function PromptNode({ data, id }: NodeProps) {
   const reactFlowInstance = useReactFlow();
-  const { deleteElements, addNodes, addEdges, setNodes, getNode } =
-    reactFlowInstance;
+  const {
+    deleteElements,
+    addNodes,
+    addEdges,
+    setNodes,
+    getNode,
+    getIntersectingNodes,
+    getNodes,
+  } = reactFlowInstance;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [prompt, setPrompt] = useState<string>((data?.prompt as string) || '');
@@ -34,6 +41,68 @@ export function PromptNode({ data, id }: NodeProps) {
   );
   const [maskImage, setMaskImage] = useState<string | null>(
     (data?.maskImage as string) || null,
+  );
+
+  // Node dimensions for collision detection
+  const IMAGE_NODE_DIMENSIONS = { width: 300, height: 300 };
+
+  // Find a non-overlapping position for new image nodes
+  const findNonOverlappingPosition = useCallback(
+    (initialPosition: { x: number; y: number }, index: number) => {
+      // Create a temporary node to check for intersections
+      const tempNode = {
+        id: 'temp',
+        position: initialPosition,
+        width: IMAGE_NODE_DIMENSIONS.width,
+        height: IMAGE_NODE_DIMENSIONS.height,
+      };
+
+      let position = { ...initialPosition };
+
+      // Arrange nodes in a grid pattern with spacing
+      const gridColumns = 2; // Number of columns in the grid
+      const horizontalSpacing = IMAGE_NODE_DIMENSIONS.width + 50;
+      const verticalSpacing = IMAGE_NODE_DIMENSIONS.height + 50;
+
+      // Calculate row and column based on index
+      const column = index % gridColumns;
+      const row = Math.floor(index / gridColumns);
+
+      // Calculate initial grid position
+      position = {
+        x: initialPosition.x + column * horizontalSpacing,
+        y: initialPosition.y + row * verticalSpacing,
+      };
+
+      // Check if this position causes overlaps
+      let tempNodeAtPosition = { ...tempNode, position };
+      let intersections = getIntersectingNodes(tempNodeAtPosition);
+
+      // If there are intersections, try to find a better position with a spiral pattern
+      if (intersections.length > 0) {
+        const spiralStep = 100;
+        let attempts = 0;
+        let angle = 0;
+        let radius = spiralStep;
+
+        while (intersections.length > 0 && attempts < 30) {
+          angle += 0.5;
+          radius = spiralStep * (1 + angle / 10);
+
+          position = {
+            x: initialPosition.x + radius * Math.cos(angle),
+            y: initialPosition.y + radius * Math.sin(angle),
+          };
+
+          tempNodeAtPosition = { ...tempNode, position };
+          intersections = getIntersectingNodes(tempNodeAtPosition);
+          attempts++;
+        }
+      }
+
+      return position;
+    },
+    [getIntersectingNodes],
   );
 
   const handlePromptChange = useCallback(
@@ -117,8 +186,8 @@ export function PromptNode({ data, id }: NodeProps) {
         throw new Error('Current node not found');
       }
 
-      // Position the new node below the current one
-      const newNodePosition = {
+      // Position for the first image node
+      const basePosition = {
         x: currentNode.position.x,
         y: currentNode.position.y + 300, // Place it below with some spacing
       };
@@ -129,15 +198,16 @@ export function PromptNode({ data, id }: NodeProps) {
 
       for (let i = 0; i < numImages; i++) {
         const imageNodeId = `image-node-${Date.now()}-${i}`;
-        const offsetPosition = {
-          x: newNodePosition.x + i * 50, // Stagger horizontally
-          y: newNodePosition.y + i * 50, // Stagger vertically
-        };
+        // Find a non-overlapping position for this image node
+        const nonOverlappingPosition = findNonOverlappingPosition(
+          basePosition,
+          i,
+        );
 
         const loadingImageNode: AppNode = {
           id: imageNodeId,
           type: 'image-node',
-          position: offsetPosition,
+          position: nonOverlappingPosition,
           data: {
             isLoading: true,
             prompt: prompt,
@@ -181,7 +251,7 @@ export function PromptNode({ data, id }: NodeProps) {
         } with parameters:`,
         params,
       );
-      const result = await processImageOperation(params, newNodePosition);
+      const result = await processImageOperation(params, basePosition);
 
       if (result.success && result.nodes && result.nodes.length > 0) {
         // Update each loading node with the corresponding generated image
@@ -271,6 +341,7 @@ export function PromptNode({ data, id }: NodeProps) {
     id,
     sourceImages,
     maskImage,
+    findNonOverlappingPosition,
   ]);
 
   useEffect(() => {

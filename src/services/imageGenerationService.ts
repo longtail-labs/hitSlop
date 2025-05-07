@@ -142,17 +142,11 @@ export const processImageOperation = async (
 
       imageUrls.push(imageUrl);
 
-      // Calculate position for each node (staggered if multiple)
-      const nodePosition = {
-        x: position.x + (index * 50), // Stagger horizontally
-        y: position.y + (index * 50)  // Stagger vertically
-      };
-
-      // Create a new image node
+      // Create a node using the caller's layout strategy (positions will be determined by the caller)
       const newNode: AppNode = {
         id: `image-node-${Date.now()}-${index}`,
         type: 'image-node',
-        position: nodePosition,
+        position: position, // This position will be overridden by the caller's layout logic
         data: {
           imageUrl,
           prompt: params.prompt,

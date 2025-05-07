@@ -13,6 +13,7 @@ import {
   ReactFlowProvider,
   SelectionMode,
   OnSelectionChangeParams,
+  Node,
 } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
@@ -26,14 +27,71 @@ import './styles.css';
 
 let nodeId = 0;
 
+// Define standard node dimensions for collision detection
+const NODE_DIMENSIONS = {
+  'prompt-node': { width: 300, height: 250 },
+  'image-node': { width: 300, height: 300 },
+};
+
 function Flow() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getNodes, getIntersectingNodes } =
+    useReactFlow();
   const [selectedImageNodes, setSelectedImageNodes] = useState<AppNode[]>([]);
   const [previousSelectionCount, setPreviousSelectionCount] = useState(0);
   const [isSelecting, setIsSelecting] = useState(false);
+
+  // Find a non-overlapping position for a new node
+  const findNonOverlappingPosition = useCallback(
+    (initialPosition: { x: number; y: number }, nodeType: string) => {
+      const currentNodes = getNodes();
+      const dimensions = NODE_DIMENSIONS[
+        nodeType as keyof typeof NODE_DIMENSIONS
+      ] || { width: 200, height: 200 };
+
+      let position = { ...initialPosition };
+      let tempNode: Node = {
+        id: 'temp',
+        type: nodeType,
+        position,
+        data: {},
+        width: dimensions.width,
+        height: dimensions.height,
+      };
+
+      // Check if the position causes overlap
+      let intersections = getIntersectingNodes(tempNode);
+
+      // If there are intersections, try to find a better position
+      if (intersections.length > 0) {
+        // Try different positions in a spiral pattern
+        const spiralStep = 100;
+        let attempts = 0;
+        let angle = 0;
+        let radius = spiralStep;
+
+        while (intersections.length > 0 && attempts < 50) {
+          // Move in a spiral pattern
+          angle += 0.5;
+          radius = spiralStep * (1 + angle / 10);
+
+          position = {
+            x: initialPosition.x + radius * Math.cos(angle),
+            y: initialPosition.y + radius * Math.sin(angle),
+          };
+
+          tempNode = { ...tempNode, position };
+          intersections = getIntersectingNodes(tempNode);
+          attempts++;
+        }
+      }
+
+      return position;
+    },
+    [getNodes, getIntersectingNodes],
+  );
 
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((edges) => addEdge(connection, edges)),
@@ -51,11 +109,17 @@ function Flow() {
           y: event.clientY - reactFlowBounds.top,
         });
 
-        // Create a new node at the clicked position
+        // Find a non-overlapping position for the new node
+        const nonOverlappingPosition = findNonOverlappingPosition(
+          position,
+          'prompt-node',
+        );
+
+        // Create a new node at the non-overlapping position
         const newNode: AppNode = {
           id: `prompt-node-${nodeId++}`,
           type: 'prompt-node',
-          position,
+          position: nonOverlappingPosition,
           data: {
             prompt: '',
           },
@@ -66,7 +130,7 @@ function Flow() {
         setNodes((nds) => [...nds, newNode]);
       }
     },
-    [screenToFlowPosition, setNodes],
+    [screenToFlowPosition, setNodes, findNonOverlappingPosition],
   );
 
   const onSelectionChange = useCallback(
@@ -102,6 +166,12 @@ function Flow() {
         200, // Place it above
     };
 
+    // Find a non-overlapping position based on the average position
+    const nonOverlappingPosition = findNonOverlappingPosition(
+      avgPosition,
+      'prompt-node',
+    );
+
     // Collect image URLs from the selected nodes
     const selectedImages = selectedImageNodes
       .map((node) => {
@@ -116,7 +186,7 @@ function Flow() {
     const newNode: AppNode = {
       id: `prompt-node-${nodeId++}`,
       type: 'prompt-node',
-      position: avgPosition,
+      position: nonOverlappingPosition,
       data: {
         prompt: '',
         sourceImages: selectedImages,
@@ -137,7 +207,7 @@ function Flow() {
     }));
 
     setEdges((edges) => [...edges, ...newEdges]);
-  }, [selectedImageNodes, setNodes, setEdges]);
+  }, [selectedImageNodes, setNodes, setEdges, findNonOverlappingPosition]);
 
   // Handle mouse up to detect when selection is finished
   useEffect(() => {
