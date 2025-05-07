@@ -11,6 +11,8 @@ export type PromptNodeData = {
   moderation?: 'auto' | 'low';
   background?: 'auto' | 'transparent' | 'opaque';
   onPromptChange?: (prompt: string) => void;
+  sourceImages?: string[];
+  maskImage?: string | null;
 };
 export type PromptNode = Node<PromptNodeData, 'prompt-node'>;
 
@@ -19,6 +21,8 @@ export type ImageNodeData = {
   prompt?: string;
   generationParams?: Record<string, any>;
   isLoading?: boolean;
+  error?: string;
+  isEdited?: boolean;
 };
 export type ImageNode = Node<ImageNodeData, 'image-node'>;
 
