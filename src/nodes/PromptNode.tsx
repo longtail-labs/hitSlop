@@ -12,7 +12,6 @@ export function PromptNode({ data, id }: NodeProps) {
     setNodes,
     getNode,
     getIntersectingNodes,
-    getNodes,
   } = reactFlowInstance;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,14 +32,10 @@ export function PromptNode({ data, id }: NodeProps) {
   const [background, setBackground] = useState<string>(
     (data?.background as string) || 'auto',
   );
-  const [showOptions, setShowOptions] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceImages, setSourceImages] = useState<string[]>(
     (data?.sourceImages as string[]) || [],
-  );
-  const [maskImage, setMaskImage] = useState<string | null>(
-    (data?.maskImage as string) || null,
   );
 
   // Node dimensions for collision detection
@@ -109,7 +104,6 @@ export function PromptNode({ data, id }: NodeProps) {
     (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newPrompt = evt.target.value;
       setPrompt(newPrompt);
-      console.log('Prompt updated:', newPrompt);
     },
     [],
   );
@@ -144,29 +138,12 @@ export function PromptNode({ data, id }: NodeProps) {
     });
   };
 
-  const handleMaskUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setMaskImage(base64String);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleRemoveImage = (index: number) => {
     setSourceImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleRemoveMask = () => {
-    setMaskImage(null);
-  };
-
   const clearImages = () => {
     setSourceImages([]);
-    setMaskImage(null);
   };
 
   const handleProcess = useCallback(async () => {
@@ -235,7 +212,6 @@ export function PromptNode({ data, id }: NodeProps) {
       const params = {
         prompt,
         sourceImages: sourceImages.length > 0 ? sourceImages : undefined,
-        maskImage: maskImage || undefined,
         model: 'gpt-image-1' as const,
         size: size as any,
         n,
@@ -245,12 +221,6 @@ export function PromptNode({ data, id }: NodeProps) {
         background: background as any,
       };
 
-      console.log(
-        `Processing image ${
-          isEditOperation ? 'edit' : 'generation'
-        } with parameters:`,
-        params,
-      );
       const result = await processImageOperation(params, basePosition);
 
       if (result.success && result.nodes && result.nodes.length > 0) {
@@ -340,16 +310,8 @@ export function PromptNode({ data, id }: NodeProps) {
     getNode,
     id,
     sourceImages,
-    maskImage,
     findNonOverlappingPosition,
   ]);
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [prompt]);
 
   const isEditMode = sourceImages.length > 0;
 
@@ -357,24 +319,27 @@ export function PromptNode({ data, id }: NodeProps) {
     <div
       className="react-flow__node-default prompt-node"
       style={{
-        width: '300px',
+        width: '420px',
         borderRadius: '8px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        backgroundColor: 'white',
-        border: '1px solid #e2e8f0',
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+        backgroundColor: '#ffffff',
+        border: '1px solid #e0e0e0',
+        color: '#333333',
       }}
     >
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: '8px' }}>
         <Handle type="target" position={Position.Top} id="input" />
 
+        {/* Top toolbar with options */}
         <div
           style={{
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '12px',
+            marginBottom: '8px',
+            gap: '6px',
           }}
         >
+          {/* Left: Close button */}
           <button
             onClick={handleDelete}
             className="nodrag"
@@ -382,194 +347,232 @@ export function PromptNode({ data, id }: NodeProps) {
               backgroundColor: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              color: '#e53e3e',
-              padding: '2px',
-              borderRadius: '4px',
-              marginRight: '8px',
+              color: '#f44336',
+              padding: '0px 4px',
+              fontSize: '14px',
+              lineHeight: 1,
             }}
           >
             ✕
           </button>
+
+          {/* Options in a row */}
           <div
             style={{
-              fontWeight: 'bold',
-              fontSize: '14px',
-              color: '#333',
+              display: 'flex',
+              gap: '5px',
               flexGrow: 1,
-              textAlign: 'center',
+              justifyContent: 'flex-start',
             }}
           >
-            {isEditMode ? 'AI Image Editor' : 'AI Image Generator'}
-          </div>
-          {isEditMode && (
-            <button
-              onClick={clearImages}
-              className="nodrag"
+            {/* Size Option */}
+            <select
+              value={size}
+              onChange={(e) => setSize(e.target.value)}
+              className="nodrag prompt-option-select"
               style={{
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#4a5568',
-                padding: '2px',
+                padding: '3px 6px',
+                fontSize: '13px',
+                backgroundColor: '#f5f5f5',
+                border: '1px solid #e0e0e0',
                 borderRadius: '4px',
-                marginLeft: '8px',
-                fontSize: '12px',
+                color: '#333',
               }}
             >
-              Clear Images
-            </button>
-          )}
+              <option value="1024x1024">1024²</option>
+              <option value="1536x1024">1536×1024</option>
+              <option value="1024x1536">1024×1536</option>
+            </select>
+
+            {/* Quality Option */}
+            <select
+              value={quality}
+              onChange={(e) => setQuality(e.target.value)}
+              className="nodrag prompt-option-select"
+              style={{
+                padding: '3px 6px',
+                fontSize: '13px',
+                backgroundColor: '#f5f5f5',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                color: '#333',
+              }}
+            >
+              {/* <option value="auto">Quality</option> */}
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+
+            {/* Number Option */}
+            <select
+              value={n}
+              onChange={(e) => setN(parseInt(e.target.value))}
+              className="nodrag prompt-option-select"
+              style={{
+                padding: '3px 6px',
+                fontSize: '13px',
+                backgroundColor: '#f5f5f5',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                color: '#333',
+              }}
+            >
+              <option value="1">1 img</option>
+              <option value="2">2 imgs</option>
+              <option value="4">4 imgs</option>
+              <option value="9">9 imgs</option>
+            </select>
+
+            {/* Background Option */}
+            <select
+              value={background}
+              onChange={(e) => setBackground(e.target.value)}
+              className="nodrag prompt-option-select"
+              style={{
+                padding: '3px 6px',
+                fontSize: '13px',
+                backgroundColor: '#f5f5f5',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                color: '#333',
+              }}
+            >
+              <option value="opaque">Opaque</option>
+              <option value="transparent">Transparent</option>
+            </select>
+          </div>
         </div>
 
-        <div>
+        {/* Main Prompt Input with buttons inside */}
+        <div
+          style={{
+            position: 'relative',
+            marginBottom: sourceImages.length > 0 ? '8px' : '0',
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={prompt}
             onChange={handlePromptChange}
             onKeyDown={handleKeyDown}
             placeholder={
-              isEditMode
-                ? 'Enter a prompt to edit the image(s)...'
-                : 'Enter a prompt to generate an image...'
+              isEditMode ? 'Edit this image...' : 'Create an image...'
             }
-            className="nodrag"
+            className="nodrag ai-prompt-input"
             style={{
               width: '100%',
-              minHeight: '80px',
-              padding: '8px',
-              borderRadius: '4px',
-              border: '1px solid #e2e8f0',
+              padding: '10px',
+              height: '100px',
+              maxHeight: '100px',
+              minHeight: '100px',
+              borderRadius: '6px',
+              border: '1px solid #e0e0e0',
+              backgroundColor: '#f5f5f5',
+              fontSize: '14px',
+              color: '#333',
               resize: 'none',
-              fontSize: '13px',
-              lineHeight: '1.5',
-              fontFamily: 'inherit',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onWheelCapture={(e) => {
+              e.stopPropagation();
             }}
           />
 
-          <div style={{ marginTop: '12px' }}>
-            <div style={{ marginBottom: '8px' }}>
-              <label
-                htmlFor="image-upload"
-                style={{
-                  display: 'block',
-                  marginBottom: '4px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Source Images (optional, up to 16):
-              </label>
-              <input
-                id="image-upload"
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={handleImageUpload}
-                multiple
-                className="nodrag"
-                style={{
-                  width: '100%',
-                  padding: '4px',
-                  fontSize: '12px',
-                }}
-              />
-            </div>
+          {/* Upload Image Button (Top Right Inside Input) */}
+          <label
+            htmlFor="image-upload"
+            className="nodrag"
+            style={{
+              position: 'absolute',
+              right: '10px',
+              top: '10px',
+              cursor: 'pointer',
+              color: '#9e9e9e',
+              fontSize: '16px',
+            }}
+          >
+            📎
+          </label>
+          <input
+            id="image-upload"
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={handleImageUpload}
+            multiple
+            className="nodrag"
+            style={{ display: 'none' }}
+          />
 
-            {sourceImages.length > 0 && (
+          {/* Generate Button (Bottom Right Inside Input) */}
+          <button
+            onClick={handleProcess}
+            className="nodrag"
+            disabled={isProcessing}
+            title={
+              isProcessing
+                ? 'Processing...'
+                : isEditMode
+                ? 'Edit image'
+                : 'Generate image'
+            }
+            style={{
+              position: 'absolute',
+              right: '10px',
+              bottom: '10px',
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              backgroundColor: '#4285f4',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '14px',
+              padding: 0,
+            }}
+          >
+            {isProcessing ? '⏳' : '▶'}
+          </button>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div
+            style={{ color: '#f44336', fontSize: '12px', marginBottom: '8px' }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Source Images Display (Below Text Input) */}
+        {sourceImages.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '6px',
+              backgroundColor: '#f5f5f5',
+              padding: '6px',
+              borderRadius: '4px',
+            }}
+          >
+            {sourceImages.map((img, index) => (
               <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  marginBottom: '8px',
-                }}
-              >
-                {sourceImages.map((img, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      position: 'relative',
-                      width: '60px',
-                      height: '60px',
-                    }}
-                  >
-                    <img
-                      src={img}
-                      alt={`Selected ${index}`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        borderRadius: '4px',
-                      }}
-                    />
-                    <button
-                      onClick={() => handleRemoveImage(index)}
-                      className="nodrag"
-                      style={{
-                        position: 'absolute',
-                        top: '-6px',
-                        right: '-6px',
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        backgroundColor: '#e53e3e',
-                        color: 'white',
-                        border: 'none',
-                        fontSize: '10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {sourceImages.length > 0 && (
-              <div style={{ marginBottom: '8px' }}>
-                <label
-                  htmlFor="mask-upload"
-                  style={{
-                    display: 'block',
-                    marginBottom: '4px',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Mask Image (optional):
-                </label>
-                <input
-                  id="mask-upload"
-                  type="file"
-                  accept="image/png"
-                  onChange={handleMaskUpload}
-                  className="nodrag"
-                  style={{
-                    width: '100%',
-                    padding: '4px',
-                    fontSize: '12px',
-                  }}
-                />
-              </div>
-            )}
-
-            {maskImage && (
-              <div
+                key={index}
                 style={{
                   position: 'relative',
-                  width: '80px',
-                  height: '80px',
-                  marginBottom: '8px',
+                  width: '50px',
+                  height: '50px',
                 }}
               >
                 <img
-                  src={maskImage}
-                  alt="Mask"
+                  src={img}
+                  alt={`Selected ${index}`}
                   style={{
                     width: '100%',
                     height: '100%',
@@ -578,252 +581,50 @@ export function PromptNode({ data, id }: NodeProps) {
                   }}
                 />
                 <button
-                  onClick={handleRemoveMask}
+                  onClick={() => handleRemoveImage(index)}
                   className="nodrag"
                   style={{
                     position: 'absolute',
-                    top: '-6px',
-                    right: '-6px',
-                    width: '18px',
-                    height: '18px',
+                    top: '-5px',
+                    right: '-5px',
+                    width: '16px',
+                    height: '16px',
                     borderRadius: '50%',
-                    backgroundColor: '#e53e3e',
+                    backgroundColor: '#f44336',
                     color: 'white',
                     border: 'none',
-                    fontSize: '10px',
+                    fontSize: '8px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
+                    padding: 0,
                   }}
                 >
                   ✕
                 </button>
               </div>
-            )}
-          </div>
-
-          {showOptions && (
-            <div style={{ marginTop: '12px' }}>
-              <div
+            ))}
+            {sourceImages.length > 0 && (
+              <button
+                onClick={clearImages}
+                className="nodrag"
                 style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  marginBottom: '8px',
+                  backgroundColor: '#e0e0e0',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#333',
+                  padding: '1px 4px',
+                  borderRadius: '3px',
+                  fontSize: '10px',
+                  alignSelf: 'flex-start',
                 }}
               >
-                <div style={{ flex: '1 0 48%' }}>
-                  <label
-                    htmlFor="size"
-                    style={{ display: 'block', marginBottom: '2px' }}
-                  >
-                    Size:
-                  </label>
-                  <select
-                    id="size"
-                    value={size}
-                    onChange={(e) => setSize(e.target.value)}
-                    className="nodrag"
-                    style={{
-                      width: '100%',
-                      padding: '3px',
-                      borderRadius: '3px',
-                      border: '1px solid #ddd',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <option value="1024x1024">1024x1024</option>
-                    <option value="1536x1024">1536x1024</option>
-                    <option value="1024x1536">1024x1536</option>
-                    <option value="auto">Auto</option>
-                  </select>
-                </div>
-
-                <div style={{ flex: '1 0 48%' }}>
-                  <label
-                    htmlFor="n"
-                    style={{ display: 'block', marginBottom: '2px' }}
-                  >
-                    Number:
-                  </label>
-                  <select
-                    id="n"
-                    value={n}
-                    onChange={(e) => setN(parseInt(e.target.value))}
-                    className="nodrag"
-                    style={{
-                      width: '100%',
-                      padding: '3px',
-                      borderRadius: '3px',
-                      border: '1px solid #ddd',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                  </select>
-                </div>
-
-                <div style={{ flex: '1 0 48%' }}>
-                  <label
-                    htmlFor="quality"
-                    style={{ display: 'block', marginBottom: '2px' }}
-                  >
-                    Quality:
-                  </label>
-                  <select
-                    id="quality"
-                    value={quality}
-                    onChange={(e) => setQuality(e.target.value)}
-                    className="nodrag"
-                    style={{
-                      width: '100%',
-                      padding: '3px',
-                      borderRadius: '3px',
-                      border: '1px solid #ddd',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <option value="auto">Auto</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                </div>
-
-                <div style={{ flex: '1 0 48%' }}>
-                  <label
-                    htmlFor="outputFormat"
-                    style={{ display: 'block', marginBottom: '2px' }}
-                  >
-                    Format:
-                  </label>
-                  <select
-                    id="outputFormat"
-                    value={outputFormat}
-                    onChange={(e) => setOutputFormat(e.target.value)}
-                    className="nodrag"
-                    style={{
-                      width: '100%',
-                      padding: '3px',
-                      borderRadius: '3px',
-                      border: '1px solid #ddd',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <option value="png">PNG</option>
-                    <option value="jpeg">JPEG</option>
-                    <option value="webp">WebP</option>
-                  </select>
-                </div>
-
-                {!isEditMode && (
-                  <div style={{ flex: '1 0 48%' }}>
-                    <label
-                      htmlFor="moderation"
-                      style={{ display: 'block', marginBottom: '2px' }}
-                    >
-                      Moderation:
-                    </label>
-                    <select
-                      id="moderation"
-                      value={moderation}
-                      onChange={(e) => setModeration(e.target.value)}
-                      className="nodrag"
-                      style={{
-                        width: '100%',
-                        padding: '3px',
-                        borderRadius: '3px',
-                        border: '1px solid #ddd',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <option value="auto">Auto</option>
-                      <option value="low">Low</option>
-                    </select>
-                  </div>
-                )}
-
-                <div style={{ flex: '1 0 48%' }}>
-                  <label
-                    htmlFor="background"
-                    style={{ display: 'block', marginBottom: '2px' }}
-                  >
-                    Background:
-                  </label>
-                  <select
-                    id="background"
-                    value={background}
-                    onChange={(e) => setBackground(e.target.value)}
-                    className="nodrag"
-                    style={{
-                      width: '100%',
-                      padding: '3px',
-                      borderRadius: '3px',
-                      border: '1px solid #ddd',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <option value="auto">Auto</option>
-                    <option value="transparent">Transparent</option>
-                    <option value="opaque">Opaque</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {error && (
-          <div style={{ color: 'red', fontSize: '12px', marginTop: '5px' }}>
-            {error}
+                Clear
+              </button>
+            )}
           </div>
         )}
-
-        <button
-          onClick={() => setShowOptions(!showOptions)}
-          className="nodrag"
-          style={{
-            marginTop: '8px',
-            padding: '6px 12px',
-            backgroundColor: '#f8f9fa',
-            color: '#4a5568',
-            border: '1px solid #e2e8f0',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            width: '100%',
-            fontSize: '13px',
-            marginBottom: '8px',
-          }}
-        >
-          {showOptions ? 'Hide Options' : 'Show Options'}
-        </button>
-
-        <button
-          onClick={handleProcess}
-          className="nodrag"
-          disabled={isProcessing}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: isProcessing ? '#a29bfe' : '#6c5ce7',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: isProcessing ? 'not-allowed' : 'pointer',
-            width: '100%',
-            fontWeight: 'bold',
-            fontSize: '13px',
-          }}
-        >
-          {isProcessing
-            ? 'Processing...'
-            : isEditMode
-            ? 'Edit Image'
-            : 'Generate Image'}
-        </button>
       </div>
       <Handle type="source" position={Position.Bottom} id="output" />
     </div>
