@@ -1,6 +1,6 @@
 ![](https://github.com/xyflow/web/blob/main/assets/codesandbox-header-ts.png?raw=true)
 
-# React Flow starter (Vite + TS)
+# hitSlop - Cursor for designing w/ OpenAI Image gen or something
 
 We've put together this template to serve as a starting point for folks
 interested in React Flow. You can use this both as a base for your own React
