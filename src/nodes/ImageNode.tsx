@@ -8,7 +8,7 @@ import {
   NodeHeaderActions,
   NodeHeaderDeleteAction,
 } from '@/components/node-header';
-import { ImageIcon, Download, Maximize, X } from 'lucide-react';
+import { ImageIcon, Download, Maximize } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -32,10 +32,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     addNodes,
     addEdges,
     getNode,
-    getNodes,
     getIntersectingNodes,
     fitView,
-    setNodes,
   } = reactFlowInstance;
   const [isDoubleClicking, setIsDoubleClicking] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);

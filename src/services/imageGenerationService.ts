@@ -67,7 +67,7 @@ export const processImageOperation = async (
       formData.append('prompt', params.prompt);
 
       // Convert data URLs to Blob objects and append to form
-      params.sourceImages.forEach((imageDataUrl, index) => {
+      params.sourceImages.forEach((imageDataUrl) => {
         const blob = dataURItoBlob(imageDataUrl);
         formData.append(`image[]`, blob);
       });
