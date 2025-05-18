@@ -87,19 +87,26 @@ const instructionalNodes = [
 
 function Flow() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(instructionalNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(instructionalNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow();
   const [selectedImageNodes, setSelectedImageNodes] = useState<AppNode[]>([]);
   const [previousSelectionCount, setPreviousSelectionCount] = useState(0);
   const [isSelecting, setIsSelecting] = useState(false);
 
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
   // Find a non-overlapping position for a new node
   const findNonOverlappingPosition = useCallback(
     (initialPosition: { x: number; y: number }, nodeType: string) => {
-      const dimensions = NODE_DIMENSIONS[
-        nodeType as keyof typeof NODE_DIMENSIONS
-      ] || { width: 200, height: 200 };
+      const dimensions =
+        NODE_DIMENSIONS[nodeType as keyof typeof NODE_DIMENSIONS] || {
+          width: 200,
+          height: 200,
+        };
 
       let position = { ...initialPosition };
       let tempNode: Node = {
@@ -142,6 +149,39 @@ function Flow() {
     },
     [getIntersectingNodes],
   );
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (!reactFlowWrapper.current) return;
+
+      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
+      const files = Array.from(event.dataTransfer.files);
+
+      files.forEach((file, index) => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const basePosition = screenToFlowPosition({
+            x: event.clientX - reactFlowBounds.left + index * 20,
+            y: event.clientY - reactFlowBounds.top + index * 20,
+          });
+          const position = findNonOverlappingPosition(basePosition, 'image-node');
+          const newNodeId = `image-node-${nodeId++}`;
+          const newNode: AppNode = {
+            id: newNodeId,
+            type: 'image-node',
+            position,
+            data: { imageUrl: reader.result as string },
+          };
+          setNodes((nds) => [...nds, newNode]);
+        };
+        reader.readAsDataURL(file);
+      });
+    },
+    [screenToFlowPosition, findNonOverlappingPosition, setNodes],
+  );
+
 
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((edges) => addEdge(connection, edges)),
@@ -312,6 +352,8 @@ function Flow() {
       className="flow-wrapper"
       ref={reactFlowWrapper}
       style={{ width: '100%', height: '100vh' }}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <ReactFlow
         nodes={nodes}
