@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -97,9 +97,11 @@ function Flow() {
   // Find a non-overlapping position for a new node
   const findNonOverlappingPosition = useCallback(
     (initialPosition: { x: number; y: number }, nodeType: string) => {
-      const dimensions = NODE_DIMENSIONS[
-        nodeType as keyof typeof NODE_DIMENSIONS
-      ] || { width: 200, height: 200 };
+      const dimensions =
+        NODE_DIMENSIONS[nodeType as keyof typeof NODE_DIMENSIONS] || {
+          width: 200,
+          height: 200,
+        };
 
       let position = { ...initialPosition };
       let tempNode: Node = {
@@ -143,6 +145,43 @@ function Flow() {
     [getIntersectingNodes],
   );
 
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (!reactFlowWrapper.current) return;
+
+      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
+      const files = Array.from(event.dataTransfer.files ?? []) as File[];
+
+      files.forEach((file, index) => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const basePosition = screenToFlowPosition({
+            x: event.clientX - reactFlowBounds.left + index * 20,
+            y: event.clientY - reactFlowBounds.top + index * 20,
+          });
+          const position = findNonOverlappingPosition(basePosition, 'image-node');
+          const newNodeId = `image-node-${nodeId++}`;
+          const newNode: AppNode = {
+            id: newNodeId,
+            type: 'image-node',
+            position,
+            data: { imageUrl: reader.result as string },
+          };
+          setNodes((nds: AppNode[]) => [...nds, newNode]);
+        };
+        reader.readAsDataURL(file);
+      });
+    },
+    [screenToFlowPosition, findNonOverlappingPosition, setNodes],
+  );
+
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((edges) => addEdge(connection, edges)),
     [setEdges],
@@ -180,7 +219,7 @@ function Flow() {
         };
 
         // Add the new node to the flow
-        setNodes((nds) => [...nds, newNode]);
+        setNodes((nds: AppNode[]) => [...nds, newNode]);
 
         // Focus directly on the new node with the same parameters as in ImageNode.tsx
         setTimeout(() => {
@@ -259,7 +298,7 @@ function Flow() {
     };
 
     // Add the new node to the flow
-    setNodes((nds) => [...nds, newNode]);
+    setNodes((nds: AppNode[]) => [...nds, newNode]);
 
     // Create edges connecting each selected image node to the new edit node
     const newEdges = selectedImageNodes.map((imageNode) => ({
@@ -312,6 +351,8 @@ function Flow() {
       className="flow-wrapper"
       ref={reactFlowWrapper}
       style={{ width: '100%', height: '100vh' }}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <ReactFlow
         nodes={nodes}
