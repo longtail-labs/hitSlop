@@ -1,10 +1,4 @@
-import {
-  Handle,
-  Position,
-  type NodeProps,
-  useReactFlow,
-  NodeChange,
-} from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useCallback, useRef, useEffect, useState, KeyboardEvent } from 'react';
 import { processImageOperation } from '../services/imageGenerationService';
 import { AppNode, ImageNodeData } from './types';
@@ -25,18 +19,30 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import useStore from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export function PromptNode({ data, id, selected }: NodeProps) {
-  const reactFlowInstance = useReactFlow();
   const {
-    deleteElements,
-    addNodes,
-    addEdges,
+    findNonOverlappingPosition,
     setNodes,
-    getNode,
-    getIntersectingNodes,
-    fitView,
-  } = reactFlowInstance;
+    setEdges,
+    rfInstance,
+    setNodesToFocus,
+    saveFlow,
+    createImageNode,
+  } = useStore(
+    useShallow((state) => ({
+      findNonOverlappingPosition: state.findNonOverlappingPosition,
+      setNodes: state.setNodes,
+      setEdges: state.setEdges,
+      rfInstance: state.rfInstance,
+      setNodesToFocus: state.setNodesToFocus,
+      saveFlow: state.saveFlow,
+      createImageNode: state.createImageNode,
+    })),
+  );
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [prompt, setPrompt] = useState<string>((data?.prompt as string) || '');
@@ -61,93 +67,9 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   const [sourceImages, setSourceImages] = useState<string[]>(
     (data?.sourceImages as string[]) || [],
   );
-  const [nodesToFocus, setNodesToFocus] = useState<string[]>([]);
 
   // Node dimensions for collision detection
   const IMAGE_NODE_DIMENSIONS = { width: 300, height: 300 };
-
-  // Focus on a node when it's created
-  // We need to track the last created node and focus on it
-  // This effect will run whenever nodesToFocus changes
-  useEffect(() => {
-    if (nodesToFocus.length > 0) {
-      // Set up a timer to focus on the node
-      // This gives time for the node to be added to the flow
-      const timer = setTimeout(() => {
-        nodesToFocus.forEach((nodeId) => {
-          fitView({
-            nodes: [{ id: nodeId }],
-            duration: 500,
-            padding: 1.8, // Increased padding to show more context around the node
-            maxZoom: 0.8, // Limit max zoom to prevent excessive zooming
-          });
-        });
-        // Clear the focus list after focusing
-        setNodesToFocus([]);
-      }, 100); // Small delay to ensure node is rendered
-
-      return () => clearTimeout(timer);
-    }
-  }, [nodesToFocus, fitView]);
-
-  // Find a non-overlapping position for new image nodes
-  const findNonOverlappingPosition = useCallback(
-    (initialPosition: { x: number; y: number }, index: number) => {
-      // Create a temporary node to check for intersections
-      const tempNode = {
-        id: 'temp',
-        position: initialPosition,
-        width: IMAGE_NODE_DIMENSIONS.width,
-        height: IMAGE_NODE_DIMENSIONS.height,
-      };
-
-      let position = { ...initialPosition };
-
-      // Arrange nodes in a grid pattern with spacing
-      const gridColumns = 2; // Number of columns in the grid
-      const horizontalSpacing = IMAGE_NODE_DIMENSIONS.width + 50;
-      const verticalSpacing = IMAGE_NODE_DIMENSIONS.height + 50;
-
-      // Calculate row and column based on index
-      const column = index % gridColumns;
-      const row = Math.floor(index / gridColumns);
-
-      // Calculate initial grid position
-      position = {
-        x: initialPosition.x + column * horizontalSpacing,
-        y: initialPosition.y + row * verticalSpacing,
-      };
-
-      // Check if this position causes overlaps
-      let tempNodeAtPosition = { ...tempNode, position };
-      let intersections = getIntersectingNodes(tempNodeAtPosition);
-
-      // If there are intersections, try to find a better position with a spiral pattern
-      if (intersections.length > 0) {
-        const spiralStep = 100;
-        let attempts = 0;
-        let angle = 0;
-        let radius = spiralStep;
-
-        while (intersections.length > 0 && attempts < 30) {
-          angle += 0.5;
-          radius = spiralStep * (1 + angle / 10);
-
-          position = {
-            x: initialPosition.x + radius * Math.cos(angle),
-            y: initialPosition.y + radius * Math.sin(angle),
-          };
-
-          tempNodeAtPosition = { ...tempNode, position };
-          intersections = getIntersectingNodes(tempNodeAtPosition);
-          attempts++;
-        }
-      }
-
-      return position;
-    },
-    [getIntersectingNodes],
-  );
 
   const handlePromptChange = useCallback(
     (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -156,10 +78,6 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     },
     [],
   );
-
-  const handleDelete = useCallback(() => {
-    deleteElements({ nodes: [{ id }] });
-  }, [deleteElements, id]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -201,12 +119,17 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       return;
     }
 
+    if (!rfInstance) {
+      setError('Flow instance not initialized');
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
 
     try {
       // Get the position for the new node (below the current node)
-      const currentNode = getNode(id);
+      const currentNode = rfInstance.getNode(id);
 
       if (!currentNode) {
         throw new Error('Current node not found');
@@ -224,38 +147,38 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       const newNodeIds: string[] = [];
 
       for (let i = 0; i < numImages; i++) {
-        const imageNodeId = `image-node-${Date.now()}-${i}`;
-        newNodeIds.push(imageNodeId);
-
         // Find a non-overlapping position for this image node
         const nonOverlappingPosition = findNonOverlappingPosition(
-          basePosition,
-          i,
+          {
+            x: basePosition.x + i * 20, // Slight offset for multiple images
+            y: basePosition.y + i * 20,
+          },
+          'image-node',
         );
 
-        const loadingImageNode: AppNode = {
-          id: imageNodeId,
-          type: 'image-node',
-          position: nonOverlappingPosition,
-          data: {
-            isLoading: true,
-            prompt: prompt,
-          },
-        };
+        // Create a loading image node
+        const loadingImageNode = createImageNode(nonOverlappingPosition, {
+          isLoading: true,
+          prompt: prompt,
+        });
 
+        newNodeIds.push(loadingImageNode.id);
         loadingImageNodes.push(loadingImageNode);
 
         // Add the loading node to the flow
-        addNodes(loadingImageNode);
+        setNodes((nodes) => [...nodes, loadingImageNode] as AppNode[]);
 
         // Create an edge connecting the prompt node to each image node
-        addEdges({
-          id: `edge-${id}-to-${imageNodeId}`,
-          source: id,
-          target: imageNodeId,
-          sourceHandle: 'output',
-          targetHandle: 'input',
-        });
+        setEdges((edges) => [
+          ...edges,
+          {
+            id: `edge-${id}-to-${loadingImageNode.id}`,
+            source: id,
+            target: loadingImageNode.id,
+            sourceHandle: 'output',
+            targetHandle: 'input',
+          },
+        ]);
       }
 
       // Add the new nodes to the focus list
@@ -280,11 +203,11 @@ export function PromptNode({ data, id, selected }: NodeProps) {
 
       if (result.success && result.nodes && result.nodes.length > 0) {
         // Update each loading node with the corresponding generated image
-        setNodes((nodes) =>
-          nodes.map((node) => {
+        setNodes((nodes) => {
+          return nodes.map((node) => {
             // Find the corresponding result node for this loading node
             const resultNodeIndex = loadingImageNodes.findIndex(
-              (loadingNode: AppNode) => loadingNode.id === node.id,
+              (loadingNode) => loadingNode.id === node.id,
             );
 
             if (
@@ -314,18 +237,23 @@ export function PromptNode({ data, id, selected }: NodeProps) {
                     isEdited: isEditOperation,
                   },
                 },
-              };
+              } as AppNode;
             }
             return node;
-          }),
-        );
+          }) as AppNode[];
+        });
+
+        // Save flow after successful generation
+        setTimeout(() => {
+          saveFlow();
+        }, 100);
       } else if (result.error) {
         // Update all loading nodes to show the error
-        setNodes((nodes) =>
-          nodes.map((node) => {
+        setNodes((nodes) => {
+          return nodes.map((node) => {
             if (
               loadingImageNodes.some(
-                (loadingNode: AppNode) => loadingNode.id === node.id,
+                (loadingNode) => loadingNode.id === node.id,
               )
             ) {
               return {
@@ -335,11 +263,11 @@ export function PromptNode({ data, id, selected }: NodeProps) {
                   isLoading: false,
                   error: result.error,
                 },
-              };
+              } as AppNode;
             }
             return node;
-          }),
-        );
+          }) as AppNode[];
+        });
         setError(result.error);
       }
     } catch (err) {
@@ -359,13 +287,15 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     outputFormat,
     moderation,
     background,
-    addNodes,
-    addEdges,
-    setNodes,
-    getNode,
     id,
     sourceImages,
+    rfInstance,
     findNonOverlappingPosition,
+    createImageNode,
+    setNodes,
+    setEdges,
+    setNodesToFocus,
+    saveFlow,
   ]);
 
   const isEditMode = sourceImages.length > 0;

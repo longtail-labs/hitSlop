@@ -14,7 +14,10 @@ import {
   SelectionMode,
   OnSelectionChangeParams,
   Node,
+  ControlButton,
 } from '@xyflow/react';
+import Dexie from 'dexie';
+import { Trash2 } from 'lucide-react';
 
 import '@xyflow/react/dist/style.css';
 
@@ -22,6 +25,8 @@ import { initialNodes, nodeTypes } from './nodes';
 import { initialEdges, edgeTypes } from './edges';
 import { AppNode, ImageNodeData } from './nodes/types';
 import { ArrowDown } from 'lucide-react';
+import useStore from './store';
+import { useShallow } from 'zustand/react/shallow';
 
 // Import annotation node components
 import {
@@ -42,6 +47,42 @@ globalStyle.innerHTML = `
 `;
 document.head.appendChild(globalStyle);
 
+// Define the database using Dexie
+class FlowDatabase extends Dexie {
+  flowData: Dexie.Table<any, number>;
+  imageStorage: Dexie.Table<any, string>;
+
+  constructor() {
+    super('FlowDatabase');
+    this.version(1).stores({
+      flowData: '++id,nodes,edges,viewport',
+    });
+    this.version(2).stores({
+      flowData: '++id,nodes,edges,viewport',
+      imageStorage: 'key,data,timestamp',
+    });
+    this.flowData = this.table('flowData');
+    this.imageStorage = this.table('imageStorage');
+  }
+}
+
+const db = new FlowDatabase();
+const FLOW_ID = 1; // Use a constant ID for simplicity
+
+// Helper functions to work with the image store
+async function storeImage(key: string, data: string) {
+  return db.imageStorage.put({
+    key,
+    data,
+    timestamp: Date.now(),
+  });
+}
+
+async function retrieveImage(key: string) {
+  const record = await db.imageStorage.get(key);
+  return record?.data;
+}
+
 let nodeId = 0;
 
 // Define standard node dimensions for collision detection
@@ -57,7 +98,7 @@ function InstructionAnnotation() {
       <AnnotationNodeContent>
         Click anywhere on the canvas to create a new prompt node. Double-click
         on an image to edit it, or select and drag multiple images to edit them
-        together.
+        together. You can also drag and drop local images onto the canvas.
       </AnnotationNodeContent>
       <AnnotationNodeIcon>
         <ArrowDown />
@@ -87,76 +128,110 @@ const instructionalNodes = [
 
 function Flow() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(instructionalNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { screenToFlowPosition, getNodes, getIntersectingNodes, fitView } =
-    useReactFlow();
-  const [selectedImageNodes, setSelectedImageNodes] = useState<AppNode[]>([]);
-  const [previousSelectionCount, setPreviousSelectionCount] = useState(0);
-  const [isSelecting, setIsSelecting] = useState(false);
+  const {
+    nodes,
+    edges,
+    selectedImageNodes,
+    rfInstance,
+    isSelecting,
+    isDragging,
+    nodesToFocus,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    setNodes,
+    setRfInstance,
+    setIsSelecting,
+    setIsDragging,
+    findNonOverlappingPosition,
+    createEditNodeFromSelection,
+    saveFlow,
+    restoreFlow,
+    clearFlow,
+    setSelectedImageNodes,
+    setNodesToFocus,
+  } = useStore(
+    useShallow((state) => ({
+      nodes: state.nodes,
+      edges: state.edges,
+      selectedImageNodes: state.selectedImageNodes,
+      rfInstance: state.rfInstance,
+      isSelecting: state.isSelecting,
+      isDragging: state.isDragging,
+      nodesToFocus: state.nodesToFocus,
+      onNodesChange: state.onNodesChange,
+      onEdgesChange: state.onEdgesChange,
+      onConnect: state.onConnect,
+      setNodes: state.setNodes,
+      setRfInstance: state.setRfInstance,
+      setIsSelecting: state.setIsSelecting,
+      setIsDragging: state.setIsDragging,
+      findNonOverlappingPosition: state.findNonOverlappingPosition,
+      createEditNodeFromSelection: state.createEditNodeFromSelection,
+      saveFlow: state.saveFlow,
+      restoreFlow: state.restoreFlow,
+      clearFlow: state.clearFlow,
+      setSelectedImageNodes: state.setSelectedImageNodes,
+      setNodesToFocus: state.setNodesToFocus,
+    })),
+  );
 
-  // Find a non-overlapping position for a new node
-  const findNonOverlappingPosition = useCallback(
-    (initialPosition: { x: number; y: number }, nodeType: string) => {
-      const currentNodes = getNodes();
-      const dimensions = NODE_DIMENSIONS[
-        nodeType as keyof typeof NODE_DIMENSIONS
-      ] || { width: 200, height: 200 };
+  // Initialize the flow on first render
+  useEffect(() => {
+    restoreFlow();
+  }, [restoreFlow]);
 
-      let position = { ...initialPosition };
-      let tempNode: Node = {
-        id: 'temp',
-        type: nodeType,
-        position,
-        data: {},
-        width: dimensions.width,
-        height: dimensions.height,
-      };
-
-      // Check if the position causes overlap
-      let intersections = getIntersectingNodes(tempNode);
-
-      // If there are intersections, try to find a better position
-      if (intersections.length > 0) {
-        // Try different positions in a spiral pattern
-        const spiralStep = 100;
-        let attempts = 0;
-        let angle = 0;
-        let radius = spiralStep;
-
-        while (intersections.length > 0 && attempts < 50) {
-          // Move in a spiral pattern
-          angle += 0.5;
-          radius = spiralStep * (1 + angle / 10);
-
-          position = {
-            x: initialPosition.x + radius * Math.cos(angle),
-            y: initialPosition.y + radius * Math.sin(angle),
-          };
-
-          tempNode = { ...tempNode, position };
-          intersections = getIntersectingNodes(tempNode);
-          attempts++;
-        }
-      }
-
-      return position;
+  const onInit = useCallback(
+    (instance: any) => {
+      setRfInstance(instance);
+      // Add a small timeout to ensure fitView works properly on initial load
+      setTimeout(() => {
+        instance.fitView({
+          padding: 1.0,
+          minZoom: 0.01,
+          maxZoom: 1.5,
+        });
+      }, 100);
     },
-    [getNodes, getIntersectingNodes],
+    [setRfInstance],
   );
 
-  const onConnect: OnConnect = useCallback(
-    (connection) => setEdges((edges) => addEdge(connection, edges)),
-    [setEdges],
-  );
+  // Add useEffect to ensure fitView runs when nodes change, but not during drag
+  useEffect(() => {
+    if (rfInstance && nodes.length > 0 && !isDragging) {
+      rfInstance.fitView({
+        padding: 1.0,
+        minZoom: 0.01,
+        maxZoom: 1.5,
+      });
+    }
+  }, [rfInstance, nodes, isDragging]);
+
+  // Focus on specified nodes when nodesToFocus changes
+  useEffect(() => {
+    if (rfInstance && nodesToFocus.length > 0) {
+      const timer = setTimeout(() => {
+        rfInstance.fitView({
+          nodes: nodesToFocus.map((id) => ({ id })),
+          duration: 500,
+          padding: 1.8,
+          maxZoom: 0.8,
+        });
+        // Clear the focus list after focusing
+        setNodesToFocus([]);
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [nodesToFocus, rfInstance, setNodesToFocus]);
 
   const onPaneClick = useCallback(
     (event: React.MouseEvent) => {
-      if (reactFlowWrapper.current) {
+      if (reactFlowWrapper.current && rfInstance) {
         // Get the position where the user clicked
         const reactFlowBounds =
           reactFlowWrapper.current.getBoundingClientRect();
-        const position = screenToFlowPosition({
+        const position = rfInstance.screenToFlowPosition({
           x: event.clientX - reactFlowBounds.left,
           y: event.clientY - reactFlowBounds.top,
         });
@@ -167,8 +242,10 @@ function Flow() {
           'prompt-node',
         );
 
-        // Generate a unique ID with timestamp to avoid conflicts
-        const newNodeId = `prompt-node-${nodeId++}`;
+        // Generate a truly unique ID with timestamp and random string to avoid conflicts
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 10);
+        const newNodeId = `prompt-node-${timestamp}-${randomStr}`;
 
         // Create a new node at the non-overlapping position
         const newNode: AppNode = {
@@ -184,18 +261,22 @@ function Flow() {
         // Add the new node to the flow
         setNodes((nds) => [...nds, newNode]);
 
-        // Focus directly on the new node with the same parameters as in ImageNode.tsx
+        // Save flow after adding node
         setTimeout(() => {
-          fitView({
-            nodes: [{ id: newNodeId }],
-            duration: 500,
-            padding: 1.8,
-            maxZoom: 0.8,
-          });
+          saveFlow();
         }, 100);
+
+        // Focus on the new node
+        setNodesToFocus([newNodeId]);
       }
     },
-    [screenToFlowPosition, setNodes, findNonOverlappingPosition, fitView],
+    [
+      rfInstance,
+      setNodes,
+      findNonOverlappingPosition,
+      saveFlow,
+      setNodesToFocus,
+    ],
   );
 
   const onSelectionChange = useCallback(
@@ -210,86 +291,9 @@ function Flow() {
 
       // Track that we're in the selection process
       setIsSelecting(true);
-
-      // Update the previous selection count
-      setPreviousSelectionCount(imageNodes.length);
     },
-    [previousSelectionCount],
+    [setSelectedImageNodes, setIsSelecting],
   );
-
-  const createEditNodeFromSelection = useCallback(() => {
-    if (selectedImageNodes.length === 0 || !reactFlowWrapper.current) return;
-
-    // Calculate the average position of selected nodes to place the new node
-    const avgPosition = {
-      x:
-        selectedImageNodes.reduce((sum, node) => sum + node.position.x, 0) /
-        selectedImageNodes.length,
-      y:
-        selectedImageNodes.reduce((sum, node) => sum + node.position.y, 0) /
-          selectedImageNodes.length -
-        200, // Place it above
-    };
-
-    // Find a non-overlapping position based on the average position
-    const nonOverlappingPosition = findNonOverlappingPosition(
-      avgPosition,
-      'prompt-node',
-    );
-
-    // Collect image URLs from the selected nodes
-    const selectedImages = selectedImageNodes
-      .map((node) => {
-        const data = node.data as ImageNodeData;
-        return data?.imageUrl;
-      })
-      .filter(Boolean) as string[];
-
-    if (selectedImages.length === 0) return;
-
-    // Create a new edit node
-    const newNodeId = `prompt-node-${nodeId++}`;
-    const newNode: AppNode = {
-      id: newNodeId,
-      type: 'prompt-node',
-      position: nonOverlappingPosition,
-      data: {
-        prompt: '',
-        sourceImages: selectedImages,
-      },
-      selectable: false,
-    };
-
-    // Add the new node to the flow
-    setNodes((nds) => [...nds, newNode]);
-
-    // Create edges connecting each selected image node to the new edit node
-    const newEdges = selectedImageNodes.map((imageNode) => ({
-      id: `edge-${imageNode.id}-to-${newNodeId}`,
-      source: imageNode.id,
-      target: newNodeId,
-      sourceHandle: 'output',
-      targetHandle: 'input',
-    }));
-
-    setEdges((edges) => [...edges, ...newEdges]);
-
-    // Focus directly on the new node with the same parameters as in ImageNode.tsx
-    setTimeout(() => {
-      fitView({
-        nodes: [{ id: newNodeId }],
-        duration: 500,
-        padding: 1.8,
-        maxZoom: 0.8,
-      });
-    }, 100);
-  }, [
-    selectedImageNodes,
-    setNodes,
-    setEdges,
-    findNonOverlappingPosition,
-    fitView,
-  ]);
 
   // Handle mouse up to detect when selection is finished
   useEffect(() => {
@@ -307,7 +311,113 @@ function Flow() {
     return () => {
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isSelecting, selectedImageNodes, createEditNodeFromSelection]);
+  }, [
+    isSelecting,
+    selectedImageNodes,
+    createEditNodeFromSelection,
+    setIsSelecting,
+  ]);
+
+  // Handle drag and drop for external images
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      // Get the files being dropped
+      const files = event.dataTransfer.files;
+      if (files.length === 0) return;
+
+      // Check if files are images
+      const imageFiles = Array.from(files).filter((file) =>
+        file.type.startsWith('image/'),
+      );
+      if (imageFiles.length === 0) return;
+
+      // Get the position where the file was dropped
+      if (reactFlowWrapper.current && rfInstance) {
+        const reactFlowBounds =
+          reactFlowWrapper.current.getBoundingClientRect();
+        const position = rfInstance.screenToFlowPosition({
+          x: event.clientX - reactFlowBounds.left,
+          y: event.clientY - reactFlowBounds.top,
+        });
+
+        // Process each dropped image
+        imageFiles.forEach((file, index) => {
+          // Read the file as a data URL
+          const reader = new FileReader();
+          reader.onload = (loadEvent) => {
+            const imageUrl = loadEvent.target?.result as string;
+            if (!imageUrl) return;
+
+            // Find a non-overlapping position with slight offset for multiple files
+            const offsetPosition = {
+              x: position.x + index * 20,
+              y: position.y + index * 20,
+            };
+            const nonOverlappingPosition = findNonOverlappingPosition(
+              offsetPosition,
+              'image-node',
+            );
+
+            // Generate a truly unique ID with timestamp and random string to avoid conflicts
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substring(2, 10);
+            const newNodeId = `image-node-${timestamp}-${randomStr}`;
+
+            const newNode: AppNode = {
+              id: newNodeId,
+              type: 'image-node',
+              position: nonOverlappingPosition,
+              data: {
+                imageUrl,
+                prompt: `Imported: ${file.name}`,
+                isLocalImage: true,
+              },
+            } as AppNode;
+
+            // Add the new node to the flow
+            setNodes((nds) => [...nds, newNode]);
+
+            // Save flow after adding node
+            setTimeout(() => {
+              saveFlow();
+            }, 100);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    },
+    [rfInstance, setNodes, findNonOverlappingPosition, saveFlow],
+  );
+
+  // Save flow on nodes or edges change, but not during drag
+  useEffect(() => {
+    if (rfInstance && !isDragging) {
+      const timeoutId = setTimeout(() => {
+        saveFlow();
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [nodes, edges, saveFlow, rfInstance, isDragging]);
+
+  // Track node drag state
+  const onNodeDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, [setIsDragging]);
+
+  const onNodeDragStop = useCallback(() => {
+    setIsDragging(false);
+    // Save flow after drag stops
+    setTimeout(() => {
+      saveFlow();
+    }, 100);
+  }, [saveFlow, setIsDragging]);
 
   return (
     <div
@@ -325,6 +435,11 @@ function Flow() {
         onConnect={onConnect}
         onPaneClick={onPaneClick}
         onSelectionChange={onSelectionChange}
+        onInit={onInit}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDragStop={onNodeDragStop}
         fitView
         minZoom={0.25}
         fitViewOptions={{
@@ -340,7 +455,15 @@ function Flow() {
       >
         <Background />
         <MiniMap pannable zoomable />
-        <Controls />
+        <Controls>
+          <ControlButton
+            title="Clear flow"
+            aria-label="Clear flow"
+            onClick={clearFlow}
+          >
+            <Trash2 size={15} />
+          </ControlButton>
+        </Controls>
         <Panel position="top-left">
           <h1>hitSlop</h1>
           <h3>Cursor for designing,</h3>

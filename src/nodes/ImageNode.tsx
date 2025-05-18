@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useState, useCallback } from 'react';
 import { BaseNode } from '@/components/base-node';
 import {
@@ -8,37 +8,41 @@ import {
   NodeHeaderActions,
   NodeHeaderDeleteAction,
 } from '@/components/node-header';
-import { ImageIcon, Download, Maximize, X } from 'lucide-react';
+import { ImageIcon, Download, Maximize } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-
-// Define the expected data structure
-interface ImageNodeData {
-  imageUrl?: string;
-  isLoading?: boolean;
-  error?: string;
-  prompt?: string;
-}
+import useStore from '../store';
+import { useShallow } from 'zustand/react/shallow';
+import { AppNode, ImageNodeData } from './types';
 
 export function ImageNode({ data, selected, id }: NodeProps) {
   // Cast data to expected type
   const nodeData = data as ImageNodeData;
-  const reactFlowInstance = useReactFlow();
-  const {
-    addNodes,
-    addEdges,
-    getNode,
-    getNodes,
-    getIntersectingNodes,
-    fitView,
-    setNodes,
-  } = reactFlowInstance;
   const [isDoubleClicking, setIsDoubleClicking] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Get required store functions
+  const {
+    findNonOverlappingPosition,
+    setNodes,
+    setEdges,
+    rfInstance,
+    setNodesToFocus,
+    createPromptNode,
+  } = useStore(
+    useShallow((state) => ({
+      findNonOverlappingPosition: state.findNonOverlappingPosition,
+      setNodes: state.setNodes,
+      setEdges: state.setEdges,
+      rfInstance: state.rfInstance,
+      setNodesToFocus: state.setNodesToFocus,
+      createPromptNode: state.createPromptNode,
+    })),
+  );
 
   const handleDownload = () => {
     if (nodeData.imageUrl) {
@@ -52,59 +56,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     }
   };
 
-  // Find a non-overlapping position for a new node
-  const findNonOverlappingPosition = useCallback(
-    (
-      initialPosition: { x: number; y: number },
-      dimensions = { width: 300, height: 250 },
-    ) => {
-      let position = { ...initialPosition };
-      let tempNode = {
-        id: 'temp',
-        position,
-        width: dimensions.width,
-        height: dimensions.height,
-      };
-
-      // Check if the position causes overlap
-      let intersections = getIntersectingNodes(tempNode);
-
-      // If there are intersections, try to find a better position
-      if (intersections.length > 0) {
-        // Try different positions in a spiral pattern
-        const spiralStep = 100;
-        let attempts = 0;
-        let angle = 0;
-        let radius = spiralStep;
-
-        while (intersections.length > 0 && attempts < 50) {
-          // Move in a spiral pattern
-          angle += 0.5;
-          radius = spiralStep * (1 + angle / 10);
-
-          position = {
-            x: initialPosition.x + radius * Math.cos(angle),
-            y: initialPosition.y + radius * Math.sin(angle),
-          };
-
-          tempNode = { ...tempNode, position };
-          intersections = getIntersectingNodes(tempNode);
-          attempts++;
-        }
-      }
-
-      return position;
-    },
-    [getIntersectingNodes],
-  );
-
   const handleDoubleClick = useCallback(() => {
-    if (!nodeData.imageUrl || isDoubleClicking) return;
+    if (!nodeData.imageUrl || isDoubleClicking || !rfInstance) return;
 
     setIsDoubleClicking(true);
 
     // Get the current node position
-    const currentNode = getNode(id);
+    const currentNode = rfInstance.getNode(id);
     if (!currentNode) {
       setIsDoubleClicking(false);
       return;
@@ -117,55 +75,49 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     };
 
     // Find a non-overlapping position
-    const newPosition = findNonOverlappingPosition(initialPosition);
-
-    // Generate a unique ID with timestamp to avoid conflicts
-    const newNodeId = `prompt-node-${Date.now()}`;
+    const newPosition = findNonOverlappingPosition(
+      initialPosition,
+      'prompt-node',
+    );
 
     // Create a new prompt node with the current image as source
-    const newNode = {
-      id: newNodeId,
-      type: 'prompt-node',
-      position: newPosition,
-      data: {
-        prompt: '',
-        sourceImages: [nodeData.imageUrl],
-      },
-      selectable: false,
-    };
-
-    // Add the new node to the flow
-    addNodes(newNode);
-
-    // Create an edge connecting the image node to the new prompt node
-    addEdges({
-      id: `edge-${id}-to-${newNodeId}`,
-      source: id,
-      target: newNodeId,
-      sourceHandle: 'output',
-      targetHandle: 'input',
+    const newNode = createPromptNode(newPosition, {
+      prompt: '',
+      sourceImages: [nodeData.imageUrl],
     });
 
-    // Focus on the newly created node
-    setTimeout(() => {
-      fitView({
-        nodes: [{ id: newNodeId }],
-        duration: 500,
-        padding: 1.8,
-        maxZoom: 0.8,
-      });
-    }, 100);
+    // Add the new node to the flow
+    setNodes((nodes) => [...nodes, newNode] as AppNode[]);
 
-    setIsDoubleClicking(false);
+    // Create an edge connecting the image node to the new prompt node
+    setEdges((edges) => [
+      ...edges,
+      {
+        id: `edge-${id}-to-${newNode.id}`,
+        source: id,
+        target: newNode.id,
+        sourceHandle: 'output',
+        targetHandle: 'input',
+      },
+    ]);
+
+    // Focus on the newly created node
+    setNodesToFocus([newNode.id]);
+
+    // Release the double-clicking lock after focus is complete
+    setTimeout(() => {
+      setIsDoubleClicking(false);
+    }, 300);
   }, [
     id,
     nodeData.imageUrl,
-    addNodes,
-    addEdges,
-    getNode,
     isDoubleClicking,
+    rfInstance,
     findNonOverlappingPosition,
-    fitView,
+    createPromptNode,
+    setNodes,
+    setEdges,
+    setNodesToFocus,
   ]);
 
   // Determine status class
