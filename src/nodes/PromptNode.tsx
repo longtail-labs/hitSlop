@@ -3,7 +3,6 @@ import {
   Position,
   type NodeProps,
   useReactFlow,
-  NodeChange,
 } from '@xyflow/react';
 import { useCallback, useRef, useEffect, useState, KeyboardEvent } from 'react';
 import { processImageOperation } from '../services/imageGenerationService';
@@ -22,14 +21,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 
 export function PromptNode({ data, id, selected }: NodeProps) {
   const reactFlowInstance = useReactFlow();
   const {
-    deleteElements,
     addNodes,
     addEdges,
     setNodes,
@@ -47,16 +44,16 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   const [quality, setQuality] = useState<string>(
     (data?.quality as string) || 'low',
   );
-  const [outputFormat, setOutputFormat] = useState<string>(
+  const [outputFormat] = useState<string>(
     (data?.outputFormat as string) || 'png',
   );
-  const [moderation, setModeration] = useState<string>(
+  const [moderation] = useState<string>(
     (data?.moderation as string) || 'auto',
   );
   const [background, setBackground] = useState<string>(
     (data?.background as string) || 'auto',
   );
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [, setIsProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceImages, setSourceImages] = useState<string[]>(
     (data?.sourceImages as string[]) || [],
@@ -157,9 +154,6 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     [],
   );
 
-  const handleDelete = useCallback(() => {
-    deleteElements({ nodes: [{ id }] });
-  }, [deleteElements, id]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
