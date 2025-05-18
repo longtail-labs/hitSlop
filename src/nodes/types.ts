@@ -26,4 +26,11 @@ export type ImageNodeData = {
 };
 export type ImageNode = Node<ImageNodeData, 'image-node'>;
 
-export type AppNode = BuiltInNode | PositionLoggerNode | PromptNode | ImageNode;
+export type AnnotationNode = Node<Record<string, never>, 'annotation-node'>;
+
+export type AppNode =
+  | BuiltInNode
+  | PositionLoggerNode
+  | PromptNode
+  | ImageNode
+  | AnnotationNode;
