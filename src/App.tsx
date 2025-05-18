@@ -89,8 +89,7 @@ function Flow() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(instructionalNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { screenToFlowPosition, getNodes, getIntersectingNodes, fitView } =
-    useReactFlow();
+  const { screenToFlowPosition, getIntersectingNodes, fitView } = useReactFlow();
   const [selectedImageNodes, setSelectedImageNodes] = useState<AppNode[]>([]);
   const [previousSelectionCount, setPreviousSelectionCount] = useState(0);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -98,7 +97,6 @@ function Flow() {
   // Find a non-overlapping position for a new node
   const findNonOverlappingPosition = useCallback(
     (initialPosition: { x: number; y: number }, nodeType: string) => {
-      const currentNodes = getNodes();
       const dimensions = NODE_DIMENSIONS[
         nodeType as keyof typeof NODE_DIMENSIONS
       ] || { width: 200, height: 200 };
@@ -142,7 +140,7 @@ function Flow() {
 
       return position;
     },
-    [getNodes, getIntersectingNodes],
+    [getIntersectingNodes],
   );
 
   const onConnect: OnConnect = useCallback(
