@@ -522,11 +522,15 @@ function Flow() {
         <Panel position="top-left">
           <h1>hitSlop</h1>
           <h3>Cursor for vibe designing,</h3>
-          <p>using OpenAI's new Image gen API</p>
+          <p>using OpenAI's new Image gen API & Gemini</p>
         </Panel>
         <Panel position="top-right">
           <div className="flex gap-2">
-            <a href="https://discord.gg/Sb7nWXbP" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://discord.gg/Sb7nWXbP"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <Button variant="outline" size="sm">
                 <DiscordIcon className="h-4 w-4" />
                 Discord
