@@ -26,6 +26,7 @@ import { initialNodes, nodeTypes } from './nodes';
 import { initialEdges, edgeTypes } from './edges';
 import { AppNode, ImageNodeData } from './nodes/types';
 import { ArrowDown, Settings } from 'lucide-react';
+import { DiscordIcon } from '@/components/ui/discord-icon';
 
 // Import annotation node components
 import {
@@ -524,16 +525,24 @@ function Flow() {
           <p>using OpenAI's new Image gen API</p>
         </Panel>
         <Panel position="top-right">
-          <ApiKeyDialog
-            open={isApiKeyDialogOpen}
-            onOpenChange={setIsApiKeyDialogOpen}
-            trigger={
+          <div className="flex gap-2">
+            <a href="https://discord.gg/Sb7nWXbP" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4" />
-                Keys
+                <DiscordIcon className="h-4 w-4" />
+                Discord
               </Button>
-            }
-          />
+            </a>
+            <ApiKeyDialog
+              open={isApiKeyDialogOpen}
+              onOpenChange={setIsApiKeyDialogOpen}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4" />
+                  Keys
+                </Button>
+              }
+            />
+          </div>
         </Panel>
       </ReactFlow>
     </div>
