@@ -6,7 +6,7 @@ export interface ImageOperationParams {
   prompt: string;
   sourceImages?: string[]; // Base64 encoded images
   maskImage?: string; // Optional base64 encoded mask
-  model?: 'gpt-image-1' | 'dall-e-2' | 'dall-e-3' | 'imagen-3' | 'imagen-3-fast' | 'imagen-4-ultra';
+  model?: 'gpt-image-1' | 'dall-e-2' | 'dall-e-3' | 'imagen-3.0-generate-002' | 'imagen-3.0-fast-generate-001' | 'imagen-4.0-generate-preview-05-20';
   size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto';
   n?: number;
   quality?: 'auto' | 'high' | 'medium' | 'low';

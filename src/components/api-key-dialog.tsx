@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiKeyService } from '@/services/database';
 import { resetOpenAIClient } from '@/services/providers/openai';
+import { resetGoogleClient } from '@/services/providers/google';
 
 interface ApiKeyDialogProps {
   open?: boolean;
@@ -20,7 +21,11 @@ interface ApiKeyDialogProps {
   trigger?: React.ReactNode;
 }
 
-export function ApiKeyDialog({ open, onOpenChange, trigger }: ApiKeyDialogProps) {
+export function ApiKeyDialog({
+  open,
+  onOpenChange,
+  trigger,
+}: ApiKeyDialogProps) {
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +62,7 @@ export function ApiKeyDialog({ open, onOpenChange, trigger }: ApiKeyDialogProps)
 
       if (googleKey.trim()) {
         await apiKeyService.saveApiKey('google', googleKey.trim());
+        resetGoogleClient();
       } else {
         await apiKeyService.deleteApiKey('google');
       }
@@ -74,7 +80,8 @@ export function ApiKeyDialog({ open, onOpenChange, trigger }: ApiKeyDialogProps)
       <DialogHeader>
         <DialogTitle>API Keys Configuration</DialogTitle>
         <DialogDescription>
-          Enter your API keys for the different providers. Keys are stored locally and securely.
+          Enter your API keys for the different providers. Keys are stored
+          locally and securely.
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4">
@@ -102,10 +109,7 @@ export function ApiKeyDialog({ open, onOpenChange, trigger }: ApiKeyDialogProps)
         </div>
       </div>
       <DialogFooter>
-        <Button
-          onClick={handleSave}
-          disabled={isLoading || isLoadingKeys}
-        >
+        <Button onClick={handleSave} disabled={isLoading || isLoadingKeys}>
           {isLoading ? 'Saving...' : 'Save Keys'}
         </Button>
       </DialogFooter>
@@ -115,9 +119,7 @@ export function ApiKeyDialog({ open, onOpenChange, trigger }: ApiKeyDialogProps)
   if (trigger) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogTrigger asChild>
-          {trigger}
-        </DialogTrigger>
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
         {content}
       </Dialog>
     );

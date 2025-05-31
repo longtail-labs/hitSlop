@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { apiKeyService } from '../database';
 
 export interface GoogleImageParams {
   prompt: string;
@@ -13,20 +14,23 @@ export interface ImageResult {
   error?: string;
 }
 
-// Initialize Google Gen AI
+// Initialize Google Gen AI client with placeholder - will be set dynamically
 let googleAI: GoogleGenAI | null = null;
 
-try {
-  // Get API key from environment
-  const apiKey = import.meta.env?.VITE_GOOGLE_API_KEY;
-
-  if (apiKey) {
-    googleAI = new GoogleGenAI({ apiKey });
-  } else {
-    console.warn('Google Gen AI not configured: Missing API key');
+async function getGoogleClient(): Promise<GoogleGenAI | null> {
+  if (!googleAI) {
+    const apiKey = await apiKeyService.getApiKey('google');
+    if (!apiKey) {
+      return null;
+    }
+    googleAI = new GoogleGenAI({ vertexai: false, apiKey });
   }
-} catch (error) {
-  console.warn('Google Gen AI not initialized:', error);
+  return googleAI;
+}
+
+// Reset client when API key changes
+export function resetGoogleClient() {
+  googleAI = null;
 }
 
 /**
@@ -34,10 +38,11 @@ try {
  */
 export const generateWithGoogle = async (params: GoogleImageParams): Promise<ImageResult> => {
   try {
-    if (!googleAI) {
+    const client = await getGoogleClient();
+    if (!client) {
       return {
         success: false,
-        error: 'Google Gen AI not configured. Please set up your API key.'
+        error: 'Google API key is not configured. Please set up your API key in settings.'
       };
     }
 
@@ -46,7 +51,7 @@ export const generateWithGoogle = async (params: GoogleImageParams): Promise<Ima
     try {
       // Use Imagen for dedicated image generation
       if (model.startsWith('imagen')) {
-        const response = await googleAI.models.generateImages({
+        const response = await client.models.generateImages({
           model,
           prompt,
           config: {
@@ -80,7 +85,7 @@ export const generateWithGoogle = async (params: GoogleImageParams): Promise<Ima
 
       } else {
         // Use Gemini for multimodal generation
-        const response = await googleAI.models.generateContent({
+        const response = await client.models.generateContent({
           model,
           contents: prompt,
           config: {

@@ -21,9 +21,9 @@ const IMAGE_MODELS = {
   'dall-e-3': 'DALL-E 3',
 
   // Google Models
-  'imagen-3': 'Imagen 3',
-  'imagen-3-fast': 'Imagen 3 Fast',
-  'imagen-4-ultra': 'Imagen 4 Ultra',
+  'imagen-3.0-generate-002': 'Imagen 3',
+  'imagen-3.0-fast-generate-001': 'Imagen 3 Fast',
+  'imagen-4.0-generate-preview-05-20': 'Imagen 4 Preview',
 } as const;
 
 type ImageModel = keyof typeof IMAGE_MODELS;
