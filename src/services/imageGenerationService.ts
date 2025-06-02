@@ -70,7 +70,7 @@ export const processImageOperation = async (
 
         // Set up streaming callbacks if nodeId provided
         if (nodeId) {
-          openAIParams.onPartialImage = (partialImageUrl: string, index: number) => {
+          openAIParams.onPartialImage = (partialImageUrl: string) => {
             params.onPartialImageUpdate?.(nodeId, partialImageUrl);
           };
 
