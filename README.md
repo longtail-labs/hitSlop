@@ -1,4 +1,4 @@
-# hitSlop - Cursor for Vibe Designing
+# hitSlop - Cursor for creating graphics
 
 hitSlop is a small playground for experimenting with AI powered image tools on
 top of React Flow.

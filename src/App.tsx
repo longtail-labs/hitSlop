@@ -524,7 +524,7 @@ function Flow() {
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
             <h1>hitSlop</h1>
           </div>
-          <h3>Cursor for vibe designing,</h3>
+          <h3>Cursor for creating graphics,</h3>
           <p>using OpenAI's new Image gen API & Gemini</p>
         </Panel>
         <Panel position="top-right">
