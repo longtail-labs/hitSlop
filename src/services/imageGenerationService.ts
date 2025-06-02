@@ -14,6 +14,11 @@ export interface ImageOperationParams {
   moderation?: 'auto' | 'low';
   background?: 'auto' | 'transparent' | 'opaque';
   outputCompression?: number;
+  // Streaming support
+  enableStreaming?: boolean;
+  partialImages?: number; // 1-3 partial images for streaming
+  onPartialImageUpdate?: (nodeId: string, partialImageUrl: string) => void;
+  onProgressUpdate?: (nodeId: string, status: string) => void;
 }
 
 export interface OperationResult {
@@ -21,6 +26,7 @@ export interface OperationResult {
   imageUrls?: string[];
   error?: string;
   nodes?: AppNode[];
+  revisedPrompt?: string;
 }
 
 /**
@@ -28,7 +34,8 @@ export interface OperationResult {
  */
 export const processImageOperation = async (
   params: ImageOperationParams,
-  position: { x: number, y: number }
+  position: { x: number, y: number },
+  nodeId?: string // For streaming updates
 ): Promise<OperationResult> => {
   try {
     const model = params.model || 'gpt-image-1';
@@ -42,8 +49,8 @@ export const processImageOperation = async (
 
     // Route to appropriate provider based on model
     if (model.startsWith('gpt-image') || model.startsWith('dall-e')) {
-      // OpenAI models
-      result = await generateWithOpenAI({
+      // OpenAI models - prepare streaming callbacks if enabled
+      const openAIParams: any = {
         prompt: params.prompt,
         model: model as any,
         size: params.size === 'auto' ? '1024x1024' : params.size,
@@ -54,9 +61,28 @@ export const processImageOperation = async (
         background: params.background,
         sourceImages: params.sourceImages,
         maskImage: params.maskImage,
-      });
+      };
+
+      // Add streaming support for gpt-image-1
+      if (model === 'gpt-image-1' && params.enableStreaming) {
+        openAIParams.stream = true;
+        openAIParams.partialImages = params.partialImages || 2;
+
+        // Set up streaming callbacks if nodeId provided
+        if (nodeId) {
+          openAIParams.onPartialImage = (partialImageUrl: string, index: number) => {
+            params.onPartialImageUpdate?.(nodeId, partialImageUrl);
+          };
+
+          openAIParams.onProgress = (status: string) => {
+            params.onProgressUpdate?.(nodeId, status);
+          };
+        }
+      }
+
+      result = await generateWithOpenAI(openAIParams);
     } else if (model.startsWith('imagen')) {
-      // Google models
+      // Google models (no streaming support yet)
       result = await generateWithGoogle({
         prompt: params.prompt,
         model: model as any,
@@ -88,14 +114,15 @@ export const processImageOperation = async (
     const nodes: AppNode[] = [];
     result.imageUrls.forEach((imageUrl, index) => {
       const newNode: AppNode = {
-        id: `image-node-${Date.now()}-${index}`,
+        id: nodeId || `image-node-${Date.now()}-${index}`,
         type: 'image-node',
         position: position, // This position will be overridden by the caller's layout logic
         data: {
           imageUrl,
           prompt: params.prompt,
           generationParams: { ...params },
-          isEdited: isEditOperation
+          isEdited: isEditOperation,
+          revisedPrompt: result.revisedPrompt
         }
       };
       nodes.push(newNode);
@@ -104,7 +131,8 @@ export const processImageOperation = async (
     return {
       success: true,
       imageUrls: result.imageUrls,
-      nodes
+      nodes,
+      revisedPrompt: result.revisedPrompt
     };
   } catch (error) {
     console.error('Error processing image:', error);

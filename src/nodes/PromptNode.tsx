@@ -11,7 +11,7 @@ import {
   NodeHeaderActions,
   NodeHeaderDeleteAction,
 } from '@/components/node-header';
-import { ImageIcon, Upload, X, Lock } from 'lucide-react';
+import { ImageIcon, Upload, X } from 'lucide-react';
 
 // Image generation models enum
 const IMAGE_MODELS = {
@@ -69,6 +69,10 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   const [error, setError] = useState<string | null>(null);
   const [sourceImages, setSourceImages] = useState<string[]>(
     (data?.sourceImages as string[]) || [],
+  );
+  // Streaming support
+  const [enableStreaming, setEnableStreaming] = useState<boolean>(
+    model === 'gpt-image-1', // Only enable for gpt-image-1 by default
   );
 
   // Node dimensions for collision detection
@@ -218,7 +222,8 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           type: 'image-node',
           position: nonOverlappingPosition,
           data: {
-            isLoading: true,
+            isLoading: !enableStreaming,
+            isStreaming: enableStreaming,
             prompt: prompt,
           },
         };
@@ -251,9 +256,56 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         outputFormat: outputFormat as any,
         moderation: moderation as any,
         background: background as any,
+        // Streaming support
+        enableStreaming: enableStreaming && model === 'gpt-image-1',
+        partialImages: 2, // Request 2 partial images during streaming
+        // Streaming callbacks
+        onPartialImageUpdate: (nodeId: string, partialImageUrl: string) => {
+          console.log(
+            'Updating node with partial image:',
+            nodeId,
+            partialImageUrl.substring(0, 50) + '...',
+          );
+          setNodes((nodes) =>
+            nodes.map((node) => {
+              if (node.id === nodeId) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    partialImageUrl,
+                    isStreaming: true,
+                  },
+                };
+              }
+              return node;
+            }),
+          );
+        },
+        onProgressUpdate: (nodeId: string, status: string) => {
+          console.log('Progress update for node:', nodeId, status);
+          setNodes((nodes) =>
+            nodes.map((node) => {
+              if (node.id === nodeId) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    streamingProgress: status,
+                  },
+                };
+              }
+              return node;
+            }),
+          );
+        },
       };
 
-      const result = await processImageOperation(params, basePosition);
+      const result = await processImageOperation(
+        params,
+        basePosition,
+        newNodeIds[0],
+      );
 
       if (result.success && result.nodes && result.nodes.length > 0) {
         // Update each loading node with the corresponding generated image
@@ -278,7 +330,11 @@ export function PromptNode({ data, id, selected }: NodeProps) {
                 data: {
                   ...node.data,
                   isLoading: false,
+                  isStreaming: false, // Clear streaming state
                   imageUrl: imageData.imageUrl,
+                  partialImageUrl: undefined, // Clear partial image
+                  streamingProgress: undefined, // Clear progress
+                  revisedPrompt: imageData.revisedPrompt,
                   generationParams: {
                     prompt,
                     model,
@@ -356,6 +412,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     sourceImages,
     findNonOverlappingPosition,
     fitView,
+    enableStreaming,
   ]);
 
   const isEditMode = sourceImages.length > 0;
@@ -406,7 +463,15 @@ export function PromptNode({ data, id, selected }: NodeProps) {
                 {Object.entries(IMAGE_MODELS).map(([value, label]) => (
                   <DropdownMenuItem
                     key={value}
-                    onClick={() => setModel(value as ImageModel)}
+                    onClick={() => {
+                      setModel(value as ImageModel);
+                      // Auto-enable streaming for gpt-image-1
+                      if (value === 'gpt-image-1') {
+                        setEnableStreaming(true);
+                      } else {
+                        setEnableStreaming(false);
+                      }
+                    }}
                     className={model === value ? 'bg-accent' : ''}
                   >
                     {label}
@@ -467,10 +532,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
                   onClick={() => setQuality('high')}
                   className={quality === 'high' ? 'bg-accent' : ''}
                 >
-                  <div className="flex items-center gap-1">
-                    High
-                    <Lock size={14} />
-                  </div>
+                  High
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

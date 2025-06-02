@@ -504,7 +504,7 @@ function Flow() {
         onPaneClick={onPaneClick}
         onSelectionChange={onSelectionChange}
         fitView
-        minZoom={0.25}
+        minZoom={0.15}
         fitViewOptions={{
           padding: 1.0, // Value from 0-1 represents percentage of the viewport
           minZoom: 0.01,
@@ -520,7 +520,10 @@ function Flow() {
         <MiniMap pannable zoomable />
         <Controls />
         <Panel position="top-left">
-          <h1>hitSlop</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
+            <h1>hitSlop</h1>
+          </div>
           <h3>Cursor for vibe designing,</h3>
           <p>using OpenAI's new Image gen API & Gemini</p>
         </Panel>

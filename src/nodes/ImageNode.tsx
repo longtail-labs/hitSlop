@@ -22,19 +22,18 @@ interface ImageNodeData {
   isLoading?: boolean;
   error?: string;
   prompt?: string;
+  revisedPrompt?: string;
+  isStreaming?: boolean;
+  partialImageUrl?: string;
+  streamingProgress?: string;
 }
 
 export function ImageNode({ data, selected, id }: NodeProps) {
   // Cast data to expected type
   const nodeData = data as ImageNodeData;
   const reactFlowInstance = useReactFlow();
-  const {
-    addNodes,
-    addEdges,
-    getNode,
-    getIntersectingNodes,
-    fitView,
-  } = reactFlowInstance;
+  const { addNodes, addEdges, getNode, getIntersectingNodes, fitView } =
+    reactFlowInstance;
   const [isDoubleClicking, setIsDoubleClicking] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -168,8 +167,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   // Determine status class
   let statusClass = '';
-  if (nodeData.isLoading) {
-    statusClass = 'animate-pulse';
+  if (nodeData.isLoading || nodeData.isStreaming) {
+    statusClass = 'animate-pulse border-2 border-blue-400';
   } else if (nodeData.error) {
     statusClass = 'border-2 border-destructive';
   } else if (nodeData.imageUrl) {
@@ -213,19 +212,38 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         </NodeHeader>
 
         <div className="image-node-content" onDoubleClick={handleDoubleClick}>
-          {nodeData.isLoading ? (
+          {nodeData.isLoading || nodeData.isStreaming ? (
             <div className="p-5 text-center min-h-[150px] flex flex-col justify-center items-center">
-              <div className="rounded-full bg-blue-500/20 w-10 h-10 mb-3 animate-spin border-2 border-blue-500 border-t-transparent"></div>
-              <div className="text-sm text-muted-foreground">
-                Generating image...
-              </div>
-              <div className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis">
-                {nodeData.prompt
-                  ? `"${String(nodeData.prompt).substring(0, 50)}${
-                      String(nodeData.prompt).length > 50 ? '...' : ''
-                    }"`
-                  : ''}
-              </div>
+              {nodeData.partialImageUrl ? (
+                // Show partial image during streaming
+                <div className="relative w-full">
+                  <img
+                    src={nodeData.partialImageUrl}
+                    alt="Partial AI image"
+                    className="max-w-full rounded opacity-75"
+                  />
+                  <div className="absolute inset-0 bg-blue-500/10 rounded flex items-center justify-center">
+                    <div className="bg-white/90 px-3 py-1 rounded-full text-xs font-medium text-blue-600">
+                      {nodeData.streamingProgress || 'Generating...'}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Show loading spinner when no partial image yet
+                <>
+                  <div className="rounded-full bg-blue-500/20 w-10 h-10 mb-3 animate-spin border-2 border-blue-500 border-t-transparent"></div>
+                  <div className="text-sm text-muted-foreground">
+                    {nodeData.streamingProgress || 'Generating image...'}
+                  </div>
+                  <div className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis">
+                    {nodeData.prompt
+                      ? `"${String(nodeData.prompt).substring(0, 50)}${
+                          String(nodeData.prompt).length > 50 ? '...' : ''
+                        }"`
+                      : ''}
+                  </div>
+                </>
+              )}
             </div>
           ) : nodeData.imageUrl ? (
             <div>
@@ -234,6 +252,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 alt="Generated AI image"
                 className="max-w-full rounded"
               />
+              {nodeData.revisedPrompt &&
+                nodeData.revisedPrompt !== nodeData.prompt && (
+                  <div className="p-2 text-xs text-muted-foreground bg-muted/50 border-t">
+                    <span className="font-medium">Revised prompt:</span>{' '}
+                    {nodeData.revisedPrompt}
+                  </div>
+                )}
             </div>
           ) : nodeData.error ? (
             <div className="p-5 text-center bg-destructive/10 rounded-sm m-2 text-destructive min-h-[100px] flex flex-col justify-center">

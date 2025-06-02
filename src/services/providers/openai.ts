@@ -34,16 +34,22 @@ export interface OpenAIImageParams {
   background?: 'auto' | 'transparent' | 'opaque';
   sourceImages?: string[];
   maskImage?: string;
+  // Streaming support
+  stream?: boolean;
+  partialImages?: number; // 1-3 partial images
+  onPartialImage?: (partialImageBase64: string, index: number) => void;
+  onProgress?: (status: string) => void;
 }
 
 export interface ImageResult {
   success: boolean;
   imageUrls?: string[];
   error?: string;
+  revisedPrompt?: string;
 }
 
 /**
- * Generate images using OpenAI's API (DALL-E 2, DALL-E 3, or GPT-Image-1)
+ * Generate images using OpenAI's Responses API (supports streaming)
  */
 export const generateWithOpenAI = async (params: OpenAIImageParams): Promise<ImageResult> => {
   try {
@@ -55,83 +61,235 @@ export const generateWithOpenAI = async (params: OpenAIImageParams): Promise<Ima
       };
     }
 
-    const isEditOperation = params.sourceImages && params.sourceImages.length > 0;
-
-    let response;
-
-    if (isEditOperation) {
-      // Handle image editing for models that support it
-      if (params.model === 'gpt-image-1') {
-        // GPT-Image-1 supports editing
-        const formData = new FormData();
-        formData.append('model', params.model);
-        formData.append('prompt', params.prompt);
-
-        params.sourceImages!.forEach((imageDataUrl) => {
-          const blob = dataURItoBlob(imageDataUrl);
-          formData.append(`image[]`, blob);
-        });
-
-        if (params.maskImage) {
-          const maskBlob = dataURItoBlob(params.maskImage);
-          formData.append('mask', maskBlob);
-        }
-
-        if (params.n) formData.append('n', params.n.toString());
-        if (params.size) formData.append('size', params.size);
-        if (params.quality) formData.append('quality', params.quality);
-        if (params.background) formData.append('background', params.background);
-
-        const apiKey = await apiKeyService.getApiKey('openai');
-        const apiResponse = await fetch('https://api.openai.com/v1/images/edits', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: formData,
-        });
-
-        if (!apiResponse.ok) {
-          const errorData = await apiResponse.json();
-          return {
-            success: false,
-            error: errorData.error?.message || `API error: ${apiResponse.status}`
-          };
-        }
-
-        response = await apiResponse.json();
-      } else {
-        // DALL-E 2 and DALL-E 3 editing (if supported)
-        return {
-          success: false,
-          error: `Image editing not supported for ${params.model}`
-        };
-      }
-    } else {
-      // Generate new images
-      const generateParams: any = {
-        model: params.model,
-        prompt: params.prompt,
-        n: params.n || 1,
-        size: params.size || '1024x1024',
-      };
-
-      // Add model-specific parameters
-      if (params.model === 'dall-e-3' || params.model === 'gpt-image-1') {
-        if (params.quality) generateParams.quality = params.quality;
-        if (params.background) generateParams.background = params.background;
-        if (params.outputFormat) generateParams.output_format = params.outputFormat;
-        if (params.moderation) generateParams.moderation = params.moderation;
-      }
-
-      response = await client.images.generate(generateParams);
+    // For DALL-E models, fallback to Image API since Responses API only supports gpt-image-1
+    if (params.model === 'dall-e-2' || params.model === 'dall-e-3') {
+      return generateWithImageAPI(params);
     }
 
-    // Process response
+    // Use Responses API for gpt-image-1
+    const isEditOperation = params.sourceImages && params.sourceImages.length > 0;
+
+    // Prepare input content
+    const inputContent: any[] = [
+      { type: "input_text", text: params.prompt }
+    ];
+
+    // Add source images if editing
+    if (isEditOperation) {
+      params.sourceImages!.forEach((imageDataUrl) => {
+        inputContent.push({
+          type: "input_image",
+          image_url: imageDataUrl
+        });
+      });
+    }
+
+    // Prepare tools configuration
+    const imageGenerationTool: any = {
+      type: "image_generation"
+    };
+
+    // Add optional parameters
+    if (params.quality && params.quality !== 'auto') {
+      imageGenerationTool.quality = params.quality;
+    }
+    if (params.background && params.background !== 'auto') {
+      imageGenerationTool.background = params.background;
+    }
+    if (params.size && params.size !== '1024x1024') {
+      imageGenerationTool.size = params.size;
+    }
+    if (params.outputFormat && params.outputFormat !== 'png') {
+      imageGenerationTool.output_format = params.outputFormat;
+    }
+    if (params.moderation && params.moderation !== 'auto') {
+      imageGenerationTool.moderation = params.moderation;
+    }
+
+    // Add mask for inpainting if provided
+    if (params.maskImage) {
+      imageGenerationTool.input_image_mask = {
+        image_url: params.maskImage
+      };
+    }
+
+    // Add streaming support
+    if (params.stream && params.partialImages) {
+      imageGenerationTool.partial_images = Math.min(Math.max(params.partialImages, 1), 3);
+    }
+
+    const requestParams: any = {
+      model: "gpt-4.1-mini", // Use a supported model for Responses API
+      input: [
+        {
+          role: "user",
+          content: inputContent
+        }
+      ],
+      tools: [imageGenerationTool]
+    };
+
+    // Handle streaming
+    if (params.stream) {
+      requestParams.stream = true;
+      return handleStreamingGeneration(client, requestParams, params);
+    } else {
+      // Non-streaming generation
+      const response = await client.responses.create(requestParams);
+      return processResponse(response);
+    }
+
+  } catch (error) {
+    console.error('OpenAI Responses API error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown OpenAI API error'
+    };
+  }
+};
+
+/**
+ * Handle streaming image generation
+ */
+async function handleStreamingGeneration(
+  client: OpenAI,
+  requestParams: any,
+  params: OpenAIImageParams
+): Promise<ImageResult> {
+  try {
+    console.log('Starting streaming generation with params:', requestParams);
+    const stream = await client.responses.create(requestParams) as any; // Type assertion for streaming
+
+    let finalImageBase64: string | null = null;
+    let revisedPrompt: string | null = null;
+    let partialImageCount = 0;
+
+    params.onProgress?.('Starting image generation...');
+
+    for await (const event of stream) {
+      console.log('Received streaming event:', event.type, event);
+
+      if (event.type === "response.image_generation_call.partial_image") {
+        partialImageCount++;
+        const partialImageBase64 = event.partial_image_b64;
+        const partialIndex = event.partial_image_index || 0;
+
+        console.log(`Received partial image ${partialImageCount}, index: ${partialIndex}`);
+        params.onProgress?.('Generating...');
+
+        // Convert base64 to data URL
+        const dataUrl = `data:image/png;base64,${partialImageBase64}`;
+        params.onPartialImage?.(dataUrl, partialIndex);
+
+      } else if (event.type === "response.image_generation_call.completed") {
+        console.log('Image generation completed event:', event);
+        finalImageBase64 = event.result;
+        revisedPrompt = event.revised_prompt;
+        params.onProgress?.('Generation complete!');
+
+      } else if (event.type === "response.completed") {
+        console.log('Response completed event:', event);
+        // This might be where the final image is
+        if (event.response?.output) {
+          const imageGenerationCall = event.response.output.find((output: any) => output.type === "image_generation_call");
+          if (imageGenerationCall && imageGenerationCall.result) {
+            console.log('Found final image in response.completed:', imageGenerationCall);
+            finalImageBase64 = imageGenerationCall.result;
+            revisedPrompt = imageGenerationCall.revised_prompt;
+          }
+        }
+      } else {
+        console.log('Unhandled event type:', event.type, event);
+      }
+    }
+
+    console.log('Streaming completed. Final image available:', !!finalImageBase64);
+
+    if (!finalImageBase64) {
+      return {
+        success: false,
+        error: 'No final image received from streaming response'
+      };
+    }
+
+    // Convert base64 to data URL
+    const finalDataUrl = `data:image/png;base64,${finalImageBase64}`;
+
+    return {
+      success: true,
+      imageUrls: [finalDataUrl],
+      revisedPrompt: revisedPrompt || undefined
+    };
+
+  } catch (error) {
+    console.error('Streaming generation error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Streaming generation failed'
+    };
+  }
+}
+
+/**
+ * Process non-streaming response
+ */
+function processResponse(response: any): ImageResult {
+  const imageData = response.output
+    .filter((output: any) => output.type === "image_generation_call")
+    .map((output: any) => output.result);
+
+  if (imageData.length === 0) {
+    return {
+      success: false,
+      error: 'No image data in response'
+    };
+  }
+
+  // Convert base64 to data URLs
+  const imageUrls = imageData.map((base64: string) => `data:image/png;base64,${base64}`);
+
+  // Get revised prompt if available
+  const imageGenerationCall = response.output.find((output: any) => output.type === "image_generation_call");
+  const revisedPrompt = imageGenerationCall?.revised_prompt;
+
+  return {
+    success: true,
+    imageUrls,
+    revisedPrompt
+  };
+}
+
+/**
+ * Fallback to Image API for DALL-E models
+ */
+async function generateWithImageAPI(params: OpenAIImageParams): Promise<ImageResult> {
+  try {
+    const client = await getOpenAIClient();
+    if (!client) {
+      return {
+        success: false,
+        error: 'OpenAI API key is not configured.'
+      };
+    }
+
+    const generateParams: any = {
+      model: params.model,
+      prompt: params.prompt,
+      n: params.n || 1,
+      size: params.size || '1024x1024',
+    };
+
+    // Add model-specific parameters for DALL-E 3
+    if (params.model === 'dall-e-3') {
+      if (params.quality && params.quality !== 'auto') generateParams.quality = params.quality;
+    }
+
+    const response = await client.images.generate(generateParams);
+
     if (!response.data || response.data.length === 0) {
       return {
         success: false,
-        error: 'No data returned from OpenAI API'
+        error: 'No data returned from OpenAI Image API'
       };
     }
 
@@ -140,13 +298,13 @@ export const generateWithOpenAI = async (params: OpenAIImageParams): Promise<Ima
 
     response.data.forEach((imageData: any) => {
       let imageUrl;
-      
+
       if (imageData.b64_json) {
         imageUrl = `data:image/${format};base64,${imageData.b64_json}`;
       } else if (imageData.url) {
         imageUrl = imageData.url;
       }
-      
+
       if (imageUrl) {
         imageUrls.push(imageUrl);
       }
@@ -158,30 +316,10 @@ export const generateWithOpenAI = async (params: OpenAIImageParams): Promise<Ima
     };
 
   } catch (error) {
-    console.error('OpenAI API error:', error);
+    console.error('OpenAI Image API error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown OpenAI API error'
+      error: error instanceof Error ? error.message : 'Image API error'
     };
   }
-};
-
-/**
- * Helper function to convert Data URL to Blob
- */
-function dataURItoBlob(dataURI: string): Blob {
-  let byteString;
-  if (dataURI.split(',')[0].indexOf('base64') >= 0) {
-    byteString = atob(dataURI.split(',')[1]);
-  } else {
-    byteString = decodeURI(dataURI.split(',')[1]);
-  }
-
-  const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-  const ia = new Uint8Array(byteString.length);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-
-  return new Blob([ia], { type: mimeString });
 }

@@ -23,6 +23,10 @@ export type ImageNodeData = {
   isLoading?: boolean;
   error?: string;
   isEdited?: boolean;
+  revisedPrompt?: string;
+  isStreaming?: boolean;
+  partialImageUrl?: string;
+  streamingProgress?: string;
 };
 export type ImageNode = Node<ImageNodeData, 'image-node'>;
 

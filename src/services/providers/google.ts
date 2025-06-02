@@ -12,6 +12,7 @@ export interface ImageResult {
   success: boolean;
   imageUrls?: string[];
   error?: string;
+  revisedPrompt?: string;
 }
 
 // Initialize Google Gen AI client with placeholder - will be set dynamically
