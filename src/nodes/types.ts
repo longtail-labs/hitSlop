@@ -1,25 +1,48 @@
 import type { Node, BuiltInNode } from '@xyflow/react';
+import { ModelConfig, MODEL_CONFIGS } from '../services/models/modelConfig';
+
+export type ModelId = keyof typeof MODEL_CONFIGS;
+
+// New type for storable generation parameters
+export interface SerializableGenerationParams {
+  prompt: string;
+  model?: ModelId;
+  size?: string;
+  n?: number;
+  sourceImages?: string[];
+  maskImage?: string | null;
+  // Include other known serializable parameters from ModelConfig's 'parameters' array
+  // For example, if 'quality', 'background', 'aspectRatio' are common model params:
+  quality?: string;
+  background?: string;
+  aspectRatio?: string;
+  // personGeneration is google specific, but if we want to store it:
+  personGeneration?: string;
+  // Add other potential params here if they should be stored
+  // Or use a more generic approach if the list is too long/dynamic:
+  // [key: string]: any; // Use with caution, prefer explicit properties
+}
 
 export type PositionLoggerNode = Node<{ label: string }, 'position-logger'>;
 export type PromptNodeData = {
   prompt?: string;
-  model?: 'gpt-image-1';
-  size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto';
+  model?: ModelId; // Updated to ModelId
+  size?: string;
   n?: number;
-  quality?: 'auto' | 'high' | 'medium' | 'low';
-  outputFormat?: 'png' | 'jpeg' | 'webp';
-  moderation?: 'auto' | 'low';
-  background?: 'auto' | 'transparent' | 'opaque';
-  onPromptChange?: (prompt: string) => void;
+  // Removed quality, outputFormat, moderation, background, aspectRatio, personGeneration
+  // These are now expected to be part of the 'modelParams' state in PromptNode
+  // and then captured in 'SerializableGenerationParams' for ImageNodeData.
+  onPromptChange?: (_prompt: string) => void; // This seems like a prop, not stored data.
   sourceImages?: string[];
   maskImage?: string | null;
+  // [key: string]: any; // Removed, let PromptNode manage dynamic params in its state.
 };
 export type PromptNode = Node<PromptNodeData, 'prompt-node'>;
 
 export type ImageNodeData = {
   imageUrl?: string;
-  prompt?: string;
-  generationParams?: Record<string, any>;
+  prompt?: string; // The original prompt that led to this image
+  generationParams?: SerializableGenerationParams; // Updated to SerializableGenerationParams
   isLoading?: boolean;
   error?: string;
   isEdited?: boolean;
@@ -27,6 +50,8 @@ export type ImageNodeData = {
   isStreaming?: boolean;
   partialImageUrl?: string;
   streamingProgress?: string;
+  modelConfig?: ModelConfig; // This is good, provides full context of the model used
+  // [key: string]: any; // Removed
 };
 export type ImageNode = Node<ImageNodeData, 'image-node'>;
 

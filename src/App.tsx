@@ -17,6 +17,7 @@ import {
   Edge,
   NodeChange,
 } from '@xyflow/react';
+import { v4 as uuidv4 } from 'uuid';
 
 import { persistenceService, apiKeyService } from './services/database';
 
@@ -27,6 +28,7 @@ import { initialEdges, edgeTypes } from './edges';
 import { AppNode, ImageNodeData } from './nodes/types';
 import { ArrowDown, Settings } from 'lucide-react';
 import { DiscordIcon } from '@/components/ui/discord-icon';
+import { GitHubIcon } from '@/components/ui/github-icon';
 
 // Import annotation node components
 import {
@@ -49,8 +51,6 @@ globalStyle.innerHTML = `
   }
 `;
 document.head.appendChild(globalStyle);
-
-let nodeId = 0;
 
 // Define standard node dimensions for collision detection
 const NODE_DIMENSIONS = {
@@ -293,8 +293,8 @@ function Flow() {
           'prompt-node',
         );
 
-        // Generate a unique ID with timestamp to avoid conflicts
-        const newNodeId = `prompt-node-${nodeId++}`;
+        // Generate a unique ID using UUID
+        const newNodeId = `prompt-node-${uuidv4()}`;
 
         // Create a new node at the non-overlapping position
         const newNode: AppNode = {
@@ -367,7 +367,7 @@ function Flow() {
     if (selectedImages.length === 0) return;
 
     // Create a new edit node
-    const newNodeId = `prompt-node-${nodeId++}`;
+    const newNodeId = `prompt-node-${uuidv4()}`;
     const newNode: AppNode = {
       id: newNodeId,
       type: 'prompt-node',
@@ -445,7 +445,7 @@ function Flow() {
             'image-node',
           );
 
-          const newNodeId = `image-node-${nodeId++}`;
+          const newNodeId = `image-node-${uuidv4()}`;
           const newNode: AppNode = {
             id: newNodeId,
             type: 'image-node',
@@ -529,6 +529,16 @@ function Flow() {
         </Panel>
         <Panel position="top-right">
           <div className="flex gap-2">
+            <a
+              href="https://github.com/longtail-labs/hitslop"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="outline" size="sm">
+                <GitHubIcon className="h-4 w-4" />
+                GitHub
+              </Button>
+            </a>
             <a
               href="https://discord.gg/Sb7nWXbP"
               target="_blank"

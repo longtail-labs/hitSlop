@@ -1,8 +1,12 @@
 import React from 'react';
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
-import { useCallback, useRef, useState, KeyboardEvent } from 'react';
-import { processImageOperation } from '../services/imageGenerationService';
-import { AppNode, ImageNodeData } from './types';
+import { useCallback, useRef, useState, KeyboardEvent, useEffect } from 'react';
+import {
+  processImageOperation,
+  getModelConfig,
+  ModelId,
+} from '../services/imageGenerationService';
+import { AppNode, ImageNodeData, SerializableGenerationParams } from './types';
 import { BaseNode } from '@/components/base-node';
 import {
   NodeHeader,
@@ -12,28 +16,7 @@ import {
   NodeHeaderDeleteAction,
 } from '@/components/node-header';
 import { ImageIcon, Upload, X } from 'lucide-react';
-
-// Image generation models enum
-const IMAGE_MODELS = {
-  // OpenAI Models
-  'gpt-image-1': 'GPT Image 1',
-  'dall-e-2': 'DALL-E 2',
-  'dall-e-3': 'DALL-E 3',
-
-  // Google Models
-  'imagen-3.0-generate-002': 'Imagen 3',
-  'imagen-3.0-fast-generate-001': 'Imagen 3 Fast',
-  'imagen-4.0-generate-preview-05-20': 'Imagen 4 Preview',
-} as const;
-
-type ImageModel = keyof typeof IMAGE_MODELS;
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+import { ModelParameterControls } from '../components/ModelParameterControls';
 
 export function PromptNode({ data, id, selected }: NodeProps) {
   const reactFlowInstance = useReactFlow();
@@ -47,33 +30,55 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   } = reactFlowInstance;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Main state
   const [prompt, setPrompt] = useState<string>((data?.prompt as string) || '');
-  const [size, setSize] = useState<string>(
-    (data?.size as string) || '1024x1024',
+  const [model, setModel] = useState<ModelId>(
+    (data?.model as ModelId) || 'gpt-image-1',
   );
-  const [n, setN] = useState<number>((data?.n as number) || 1);
-  const [quality, setQuality] = useState<string>(
-    (data?.quality as string) || 'low',
-  );
-  const [outputFormat] = useState<string>(
-    (data?.outputFormat as string) || 'png',
-  );
-  const [moderation] = useState<string>((data?.moderation as string) || 'auto');
-  const [background, setBackground] = useState<string>(
-    (data?.background as string) || 'auto',
-  );
-  const [model, setModel] = useState<ImageModel>(
-    (data?.model as ImageModel) || 'gpt-image-1',
-  );
-  const [, setIsProcessing] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [sourceImages, setSourceImages] = useState<string[]>(
     (data?.sourceImages as string[]) || [],
   );
-  // Streaming support
-  const [enableStreaming, setEnableStreaming] = useState<boolean>(
-    model === 'gpt-image-1', // Only enable for gpt-image-1 by default
-  );
+  const [error, setError] = useState<string | null>(null);
+
+  // Dynamic model parameters
+  const [modelParams, setModelParams] = useState<Record<string, any>>(() => {
+    const config = getModelConfig(model);
+    const initialParams: Record<string, any> = {
+      size: config?.defaultSize || '1024x1024',
+      n: 1,
+    };
+
+    // Set default values from model config
+    config?.parameters.forEach((param) => {
+      if (param.default !== undefined) {
+        initialParams[param.name] = param.default;
+      }
+    });
+
+    return initialParams;
+  });
+
+  // Update model parameters when model changes
+  useEffect(() => {
+    const config = getModelConfig(model);
+    if (config) {
+      setModelParams((prevParams) => {
+        const newParams: Record<string, any> = {
+          size: config.defaultSize,
+          n: Math.min(prevParams.n || 1, config.maxImages),
+        };
+
+        // Set default values from model config
+        config.parameters.forEach((param) => {
+          if (param.default !== undefined) {
+            newParams[param.name] = param.default;
+          }
+        });
+        return newParams;
+      });
+    }
+  }, [model]);
 
   // Node dimensions for collision detection
   const IMAGE_NODE_DIMENSIONS = { width: 300, height: 300 };
@@ -152,15 +157,19 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     }
   };
 
+  const handleParameterChange = useCallback((paramName: string, value: any) => {
+    setModelParams((prev) => ({
+      ...prev,
+      [paramName]: value,
+    }));
+  }, []);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // GPT-4 Vision supports up to 16 images for editing
-    const maxFiles = 16;
-    const filesToProcess = Array.from(files).slice(0, maxFiles);
-
     // Process each file and add to existing images
+    const filesToProcess = Array.from(files).slice(0, 16); // Max 16 images
     filesToProcess.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -185,33 +194,28 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       return;
     }
 
-    setIsProcessing(true);
     setError(null);
 
     try {
-      // Get the position for the new node (below the current node)
       const currentNode = getNode(id);
-
       if (!currentNode) {
         throw new Error('Current node not found');
       }
 
-      // Position for the first image node
       const basePosition = {
         x: currentNode.position.x,
-        y: currentNode.position.y + 300, // Place it below with some spacing
+        y: currentNode.position.y + 300,
       };
 
       // Create placeholder nodes for each image to be generated
       const loadingImageNodes: AppNode[] = [];
-      const numImages = n;
+      const numImages = modelParams.n || 1;
       const newNodeIds: string[] = [];
 
       for (let i = 0; i < numImages; i++) {
         const imageNodeId = `image-node-${Date.now()}-${i}`;
         newNodeIds.push(imageNodeId);
 
-        // Find a non-overlapping position for this image node
         const nonOverlappingPosition = findNonOverlappingPosition(
           basePosition,
           i,
@@ -222,18 +226,15 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           type: 'image-node',
           position: nonOverlappingPosition,
           data: {
-            isLoading: !enableStreaming,
-            isStreaming: enableStreaming,
+            isLoading: model !== 'gpt-image-1', // No loading state for GPT Image 1 (has streaming)
+            isStreaming: model === 'gpt-image-1', // Auto-enable streaming for GPT Image 1
             prompt: prompt,
           },
         };
 
         loadingImageNodes.push(loadingImageNode);
-
-        // Add the loading node to the flow
         addNodes(loadingImageNode);
 
-        // Create an edge connecting the prompt node to each image node
         addEdges({
           id: `edge-${id}-to-${imageNodeId}`,
           source: id,
@@ -243,29 +244,13 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         });
       }
 
-      // Determine if this is a generation or edit operation based on whether we have source images
-      const isEditOperation = sourceImages.length > 0;
-
       const params = {
         prompt,
-        sourceImages: sourceImages.length > 0 ? sourceImages : undefined,
         model,
-        size: size as any,
-        n,
-        quality: quality as any,
-        outputFormat: outputFormat as any,
-        moderation: moderation as any,
-        background: background as any,
-        // Streaming support
-        enableStreaming: enableStreaming && model === 'gpt-image-1',
-        partialImages: 2, // Request 2 partial images during streaming
+        sourceImages: sourceImages.length > 0 ? sourceImages : undefined,
+        ...modelParams,
         // Streaming callbacks
         onPartialImageUpdate: (nodeId: string, partialImageUrl: string) => {
-          console.log(
-            'Updating node with partial image:',
-            nodeId,
-            partialImageUrl.substring(0, 50) + '...',
-          );
           setNodes((nodes) =>
             nodes.map((node) => {
               if (node.id === nodeId) {
@@ -283,7 +268,6 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           );
         },
         onProgressUpdate: (nodeId: string, status: string) => {
-          console.log('Progress update for node:', nodeId, status);
           setNodes((nodes) =>
             nodes.map((node) => {
               if (node.id === nodeId) {
@@ -301,6 +285,15 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         },
       };
 
+      // Create a serializable version of params without callback functions
+      const loggedParams: Partial<SerializableGenerationParams> = {
+        prompt,
+        model,
+        sourceImages: sourceImages.length > 0 ? sourceImages : undefined,
+        ...modelParams,
+      };
+      console.log('Processing image with params (for logging):', loggedParams);
+
       const result = await processImageOperation(
         params,
         basePosition,
@@ -311,7 +304,6 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         // Update each loading node with the corresponding generated image
         setNodes((nodes) =>
           nodes.map((node) => {
-            // Find the corresponding result node for this loading node
             const resultNodeIndex = loadingImageNodes.findIndex(
               (loadingNode: AppNode) => loadingNode.id === node.id,
             );
@@ -321,31 +313,23 @@ export function PromptNode({ data, id, selected }: NodeProps) {
               result.nodes &&
               resultNodeIndex < result.nodes.length
             ) {
-              // Replace loading node with the generated image node data
               const resultNode = result.nodes[resultNodeIndex];
-              const imageData = resultNode.data as ImageNodeData;
+              const finalImageData = resultNode.data as ImageNodeData;
 
               return {
                 ...node,
                 data: {
-                  ...node.data,
+                  ...finalImageData,
                   isLoading: false,
-                  isStreaming: false, // Clear streaming state
-                  imageUrl: imageData.imageUrl,
-                  partialImageUrl: undefined, // Clear partial image
-                  streamingProgress: undefined, // Clear progress
-                  revisedPrompt: imageData.revisedPrompt,
-                  generationParams: {
-                    prompt,
-                    model,
-                    size,
-                    n,
-                    quality,
-                    outputFormat,
-                    moderation,
-                    background,
-                    isEdited: isEditOperation,
-                  },
+                  isStreaming: false,
+                  partialImageUrl:
+                    finalImageData.partialImageUrl === undefined
+                      ? undefined
+                      : finalImageData.partialImageUrl,
+                  streamingProgress:
+                    finalImageData.streamingProgress === undefined
+                      ? undefined
+                      : finalImageData.streamingProgress,
                 },
               };
             }
@@ -353,18 +337,15 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           }),
         );
 
-        // Focus on the first generated image
         if (newNodeIds.length > 0) {
-          const firstNodeId = newNodeIds[0];
           fitView({
-            nodes: [{ id: firstNodeId }],
+            nodes: [{ id: newNodeIds[0] }],
             duration: 500,
             padding: 1.8,
             maxZoom: 0.8,
           });
         }
       } else if (result.error) {
-        // Update all loading nodes to show the error
         setNodes((nodes) =>
           nodes.map((node) => {
             if (
@@ -390,44 +371,23 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       console.error('Error during image operation:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Unknown error occurred';
-
       setError(errorMessage);
-    } finally {
-      setIsProcessing(false);
     }
   }, [
     prompt,
     model,
-    size,
-    n,
-    quality,
-    outputFormat,
-    moderation,
-    background,
+    modelParams,
+    sourceImages,
     addNodes,
     addEdges,
     setNodes,
     getNode,
     id,
-    sourceImages,
     findNonOverlappingPosition,
     fitView,
-    enableStreaming,
   ]);
 
   const isEditMode = sourceImages.length > 0;
-
-  // Size options mapping for display
-  const sizeOptions = {
-    '1024x1024': '1024²',
-    '1536x1024': '1536×1024',
-    '1024x1536': '1024×1536',
-  };
-
-  // Dropdown label formatting helper
-  const formatDropdownLabel = (value: string) => {
-    return value.charAt(0).toUpperCase() + value.slice(1);
-  };
 
   return (
     <div>
@@ -446,148 +406,16 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         </NodeHeader>
 
         <div className="p-2">
-          {/* Options in a row */}
-          <div className="flex gap-2 mb-2">
-            {/* Model Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-32"
-                >
-                  {IMAGE_MODELS[model]}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {Object.entries(IMAGE_MODELS).map(([value, label]) => (
-                  <DropdownMenuItem
-                    key={value}
-                    onClick={() => {
-                      setModel(value as ImageModel);
-                      // Auto-enable streaming for gpt-image-1
-                      if (value === 'gpt-image-1') {
-                        setEnableStreaming(true);
-                      } else {
-                        setEnableStreaming(false);
-                      }
-                    }}
-                    className={model === value ? 'bg-accent' : ''}
-                  >
-                    {label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Size Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
-                >
-                  {sizeOptions[size as keyof typeof sizeOptions]}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {Object.entries(sizeOptions).map(([value, label]) => (
-                  <DropdownMenuItem
-                    key={value}
-                    onClick={() => setSize(value)}
-                    className={size === value ? 'bg-accent' : ''}
-                  >
-                    {label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Quality Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
-                >
-                  {formatDropdownLabel(quality)}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem
-                  onClick={() => setQuality('low')}
-                  className={quality === 'low' ? 'bg-accent' : ''}
-                >
-                  Low
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setQuality('medium')}
-                  className={quality === 'medium' ? 'bg-accent' : ''}
-                >
-                  Medium
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setQuality('high')}
-                  className={quality === 'high' ? 'bg-accent' : ''}
-                >
-                  High
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Number of Images Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
-                >
-                  {n} {n === 1 ? 'img' : 'imgs'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                  <DropdownMenuItem
-                    key={num}
-                    onClick={() => setN(num)}
-                    className={n === num ? 'bg-accent' : ''}
-                  >
-                    {num} {num === 1 ? 'img' : 'imgs'}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Background Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs px-2 py-1 bg-muted border border-border w-24"
-                >
-                  {formatDropdownLabel(background)}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem
-                  onClick={() => setBackground('opaque')}
-                  className={background === 'opaque' ? 'bg-accent' : ''}
-                >
-                  Opaque
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setBackground('transparent')}
-                  className={background === 'transparent' ? 'bg-accent' : ''}
-                >
-                  Transparent
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {/* Dynamic Model Parameters with Model Selection */}
+          <ModelParameterControls
+            modelId={model}
+            currentParams={modelParams}
+            onParameterChange={handleParameterChange}
+            className="mb-2"
+            showModelSelector={true}
+            selectedModel={model}
+            onModelChange={setModel}
+          />
 
           {/* Main Prompt Input with buttons inside */}
           <div className="relative">
@@ -626,10 +454,10 @@ export function PromptNode({ data, id, selected }: NodeProps) {
             {/* Generate Button */}
             <button
               onClick={handleProcess}
-              className="nodrag absolute right-2 bottom-2 w-7 h-7 flex items-center justify-center rounded bg-primary text-primary-foreground"
+              className="nodrag absolute right-2 bottom-2 w-7 h-7 flex items-center justify-center rounded bg-primary text-primary-foreground disabled:opacity-50"
               title={isEditMode ? 'Edit image' : 'Generate image'}
             >
-              ▶
+              {'▶'}
             </button>
           </div>
 

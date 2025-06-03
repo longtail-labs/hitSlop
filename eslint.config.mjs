@@ -59,6 +59,7 @@ export default defineConfig([
         },
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
 ]);

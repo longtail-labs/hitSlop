@@ -1,24 +1,24 @@
-import { AppNode } from '../nodes/types';
+import { AppNode, SerializableGenerationParams } from '../nodes/types';
 import { generateWithOpenAI } from './providers/openai';
 import { generateWithGoogle } from './providers/google';
+import { getModelConfig, validateModelParameters, MODEL_CONFIGS } from './models/modelConfig';
+
+export type ModelId = keyof typeof MODEL_CONFIGS;
 
 export interface ImageOperationParams {
   prompt: string;
   sourceImages?: string[]; // Base64 encoded images
   maskImage?: string; // Optional base64 encoded mask
-  model?: 'gpt-image-1' | 'dall-e-2' | 'dall-e-3' | 'imagen-3.0-generate-002' | 'imagen-3.0-fast-generate-001' | 'imagen-4.0-generate-preview-05-20';
-  size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto';
+  model?: ModelId; // Now accepts any model ID from config
+  size?: string;
   n?: number;
-  quality?: 'auto' | 'high' | 'medium' | 'low';
-  outputFormat?: 'png' | 'jpeg' | 'webp';
-  moderation?: 'auto' | 'low';
-  background?: 'auto' | 'transparent' | 'opaque';
-  outputCompression?: number;
+  // Dynamic parameters based on model config
+  [key: string]: any;
   // Streaming support
   enableStreaming?: boolean;
   partialImages?: number; // 1-3 partial images for streaming
-  onPartialImageUpdate?: (nodeId: string, partialImageUrl: string) => void;
-  onProgressUpdate?: (nodeId: string, status: string) => void;
+  onPartialImageUpdate?: (_nodeId: string, _partialImageUrl: string) => void;
+  onProgressUpdate?: (_nodeId: string, _status: string) => void;
 }
 
 export interface OperationResult {
@@ -38,61 +38,73 @@ export const processImageOperation = async (
   nodeId?: string // For streaming updates
 ): Promise<OperationResult> => {
   try {
-    const model = params.model || 'gpt-image-1';
+    const modelId = params.model || 'gpt-image-1';
+    const modelConfig = getModelConfig(modelId);
+
+    if (!modelConfig) {
+      return {
+        success: false,
+        error: `Unsupported model: ${modelId}`
+      };
+    }
+
+    // Validate parameters for this model
+    const validation = validateModelParameters(modelId, params);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: `Parameter validation failed: ${validation.errors.join(', ')}`
+      };
+    }
 
     // Determine whether to generate or edit based on sourceImages
     const isEditOperation = params.sourceImages && params.sourceImages.length > 0;
 
-    console.log(`Performing image ${isEditOperation ? 'edit' : 'generation'} with model ${model}:`, params);
+    console.log(`Performing image ${isEditOperation ? 'edit' : 'generation'} with model ${modelConfig.name}:`, params);
 
     let result;
 
-    // Route to appropriate provider based on model
-    if (model.startsWith('gpt-image') || model.startsWith('dall-e')) {
-      // OpenAI models - prepare streaming callbacks if enabled
-      const openAIParams: any = {
+    // Route to appropriate provider based on model configuration
+    if (modelConfig.provider === 'openai') {
+      // Prepare OpenAI-specific parameters
+      const openAIParams = {
         prompt: params.prompt,
-        model: model as any,
-        size: params.size === 'auto' ? '1024x1024' : params.size,
+        model: modelId,
+        size: params.size,
         n: params.n,
         quality: params.quality,
-        outputFormat: params.outputFormat,
-        moderation: params.moderation,
+        outputFormat: 'png', // Always use PNG
+        moderation: 'low', // Always use low moderation
         background: params.background,
         sourceImages: params.sourceImages,
         maskImage: params.maskImage,
+        stream: modelId === 'gpt-image-1', // Always stream for GPT Image 1
+        partialImages: 2, // Default to 2 partial images
+        onPartialImage: nodeId ? (partialImageUrl: string) => {
+          params.onPartialImageUpdate?.(nodeId, partialImageUrl);
+        } : undefined,
+        onProgress: nodeId ? (status: string) => {
+          params.onProgressUpdate?.(nodeId, status);
+        } : undefined,
       };
 
-      // Add streaming support for gpt-image-1
-      if (model === 'gpt-image-1' && params.enableStreaming) {
-        openAIParams.stream = true;
-        openAIParams.partialImages = params.partialImages || 2;
-
-        // Set up streaming callbacks if nodeId provided
-        if (nodeId) {
-          openAIParams.onPartialImage = (partialImageUrl: string) => {
-            params.onPartialImageUpdate?.(nodeId, partialImageUrl);
-          };
-
-          openAIParams.onProgress = (status: string) => {
-            params.onProgressUpdate?.(nodeId, status);
-          };
-        }
-      }
-
       result = await generateWithOpenAI(openAIParams);
-    } else if (model.startsWith('imagen')) {
-      // Google models (no streaming support yet)
-      result = await generateWithGoogle({
+    } else if (modelConfig.provider === 'google') {
+      // Prepare Google-specific parameters
+      const googleParams = {
         prompt: params.prompt,
-        model: model as any,
-        size: params.size === 'auto' ? '1024x1024' : params.size,
+        model: modelId,
+        size: params.size,
         n: params.n,
-      });
+        aspectRatio: params.aspectRatio,
+        personGeneration: params.personGeneration,
+      };
+
+      result = await generateWithGoogle(googleParams);
     } else {
       return {
         success: false,
-        error: `Unsupported model: ${model}`
+        error: `Unsupported provider: ${modelConfig.provider}`
       };
     }
 
@@ -112,6 +124,23 @@ export const processImageOperation = async (
 
     // Create nodes for each generated image
     const nodes: AppNode[] = [];
+    // Construct serializable generation parameters for storage in the node
+    const serializableParams: SerializableGenerationParams = {
+      prompt: params.prompt,
+      model: params.model,
+      size: params.size,
+      n: params.n,
+      sourceImages: params.sourceImages,
+      maskImage: params.maskImage,
+      // Add other model-specific parameters that were actually used and are serializable
+      // These would come from params, e.g., params.quality, params.aspectRatio, etc.
+    };
+    // Add known dynamic params to serializableParams if they exist in 'params'
+    if (params.quality !== undefined) serializableParams.quality = params.quality;
+    if (params.background !== undefined) serializableParams.background = params.background;
+    if (params.aspectRatio !== undefined) serializableParams.aspectRatio = params.aspectRatio;
+    if (params.personGeneration !== undefined) serializableParams.personGeneration = params.personGeneration;
+
     result.imageUrls.forEach((imageUrl, index) => {
       const newNode: AppNode = {
         id: nodeId || `image-node-${Date.now()}-${index}`,
@@ -120,9 +149,10 @@ export const processImageOperation = async (
         data: {
           imageUrl,
           prompt: params.prompt,
-          generationParams: { ...params },
+          generationParams: serializableParams, // Use the explicitly constructed serializable params
           isEdited: isEditOperation,
-          revisedPrompt: result.revisedPrompt
+          revisedPrompt: result.revisedPrompt,
+          modelConfig // Include model config in node data
         }
       };
       nodes.push(newNode);
@@ -142,4 +172,7 @@ export const processImageOperation = async (
     };
   }
 };
+
+// Export model configs for UI components
+export { MODEL_CONFIGS, getModelConfig, getAvailableParameters } from './models/modelConfig';
 

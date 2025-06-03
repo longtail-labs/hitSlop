@@ -25,20 +25,20 @@ export function resetOpenAIClient() {
 
 export interface OpenAIImageParams {
   prompt: string;
-  model: 'gpt-image-1' | 'dall-e-2' | 'dall-e-3';
-  size?: '1024x1024' | '1536x1024' | '1024x1536';
+  model: string; // Now accepts any OpenAI model ID
+  size?: string;
   n?: number;
-  quality?: 'auto' | 'high' | 'medium' | 'low';
-  outputFormat?: 'png' | 'jpeg' | 'webp';
-  moderation?: 'auto' | 'low';
-  background?: 'auto' | 'transparent' | 'opaque';
+  quality?: string;
+  outputFormat?: string;
+  moderation?: string;
+  background?: string;
   sourceImages?: string[];
   maskImage?: string;
   // Streaming support
   stream?: boolean;
   partialImages?: number; // 1-3 partial images
-  onPartialImage?: (partialImageBase64: string, index: number) => void;
-  onProgress?: (status: string) => void;
+  onPartialImage?: (_partialImageBase64: string, _index: number) => void;
+  onProgress?: (_status: string) => void;
 }
 
 export interface ImageResult {
@@ -96,7 +96,9 @@ export const generateWithOpenAI = async (params: OpenAIImageParams): Promise<Ima
     if (params.background && params.background !== 'auto') {
       imageGenerationTool.background = params.background;
     }
-    if (params.size && params.size !== '1024x1024') {
+    // Always include size parameter to ensure correct dimensions
+    if (params.size) {
+      console.log('Setting image generation size:', params.size);
       imageGenerationTool.size = params.size;
     }
     if (params.outputFormat && params.outputFormat !== 'png') {
@@ -117,6 +119,8 @@ export const generateWithOpenAI = async (params: OpenAIImageParams): Promise<Ima
     if (params.stream && params.partialImages) {
       imageGenerationTool.partial_images = Math.min(Math.max(params.partialImages, 1), 3);
     }
+
+    console.log('Image generation tool config:', imageGenerationTool);
 
     const requestParams: any = {
       model: "gpt-4.1-mini", // Use a supported model for Responses API

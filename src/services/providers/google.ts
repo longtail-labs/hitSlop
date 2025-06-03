@@ -3,9 +3,11 @@ import { apiKeyService } from '../database';
 
 export interface GoogleImageParams {
   prompt: string;
-  model?: 'imagen-3.0-generate-002' | 'gemini-2.0-flash-preview-image-generation';
-  size?: '1024x1024' | '1536x1024' | '1024x1536';
+  model?: string; // Now accepts any Google model ID
+  size?: string;
   n?: number;
+  aspectRatio?: string;
+  personGeneration?: string;
 }
 
 export interface ImageResult {
@@ -47,17 +49,27 @@ export const generateWithGoogle = async (params: GoogleImageParams): Promise<Ima
       };
     }
 
-    const { prompt, model = 'imagen-3.0-generate-002', n = 1 } = params;
+    const { prompt, model = 'imagen-3.0-generate-002', n = 1, aspectRatio } = params;
 
     try {
       // Use Imagen for dedicated image generation
       if (model.startsWith('imagen')) {
+        const config: any = {
+          numberOfImages: n
+        };
+
+        // Add aspectRatio if provided
+        if (aspectRatio) {
+          config.aspectRatio = aspectRatio;
+        }
+
+        // Always allow adult person generation
+        config.personGeneration = 'allow_adult';
+
         const response = await client.models.generateImages({
           model,
           prompt,
-          config: {
-            numberOfImages: n
-          }
+          config
         });
 
         if (!response.generatedImages?.length) {
