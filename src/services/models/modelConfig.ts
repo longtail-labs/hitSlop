@@ -3,7 +3,6 @@ export type ModelProvider = 'openai' | 'google';
 export type ModelCapability =
   | 'generation'
   | 'editing'
-  | 'streaming'
   | 'inpainting'
   | 'variations'
   | 'multi_turn'
@@ -42,11 +41,10 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
     id: 'gpt-image-1',
     name: 'GPT Image 1',
     provider: 'openai',
-    description: 'Latest multimodal model with superior instruction following and streaming support',
+    description: 'Latest multimodal model with superior instruction following',
     capabilities: [
       'generation',
       'editing',
-      'streaming',
       'inpainting',
       'multi_turn',
       'transparent_background',
@@ -70,12 +68,12 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
         description: 'Background type'
       }
     ],
-    maxImages: 9,
+    maxImages: 10,
     defaultSize: '1024x1024',
     supportedSizes: ['1024x1024', '1536x1024', '1024x1536'],
-    apiEndpoint: 'responses',
+    apiEndpoint: 'image',
     costTier: 'high',
-    avgLatency: 'slow'
+    avgLatency: 'medium'
   },
 
   'dall-e-3': {
@@ -92,6 +90,14 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
         default: 'standard',
         label: 'Quality',
         description: 'Image quality level'
+      },
+      {
+        name: 'style',
+        type: 'select',
+        options: ['vivid', 'natural'],
+        default: 'vivid',
+        label: 'Style',
+        description: 'Image style'
       }
     ],
     maxImages: 1,

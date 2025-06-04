@@ -3,6 +3,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   MiniMap,
   addEdge,
   useNodesState,
@@ -19,14 +20,19 @@ import {
 } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { persistenceService, apiKeyService } from './services/database';
+import {
+  persistenceService,
+  apiKeyService,
+  imageService,
+  db,
+} from './services/database';
 
 import '@xyflow/react/dist/style.css';
 
 import { initialNodes, nodeTypes } from './nodes';
 import { initialEdges, edgeTypes } from './edges';
 import { AppNode, ImageNodeData } from './nodes/types';
-import { ArrowDown, Settings } from 'lucide-react';
+import { ArrowDown, Settings, Trash } from 'lucide-react';
 import { DiscordIcon } from '@/components/ui/discord-icon';
 import { GitHubIcon } from '@/components/ui/github-icon';
 
@@ -356,15 +362,15 @@ function Flow() {
       'prompt-node',
     );
 
-    // Collect image URLs from the selected nodes
-    const selectedImages = selectedImageNodes
+    // Collect image references from the selected nodes (prefer imageId over imageUrl)
+    const selectedImageReferences = selectedImageNodes
       .map((node) => {
         const data = node.data as ImageNodeData;
-        return data?.imageUrl;
+        return data?.imageId || data?.imageUrl; // Prefer imageId, fallback to imageUrl
       })
       .filter(Boolean) as string[];
 
-    if (selectedImages.length === 0) return;
+    if (selectedImageReferences.length === 0) return;
 
     // Create a new edit node
     const newNodeId = `prompt-node-${uuidv4()}`;
@@ -374,7 +380,7 @@ function Flow() {
       position: nonOverlappingPosition,
       data: {
         prompt: '',
-        sourceImages: selectedImages,
+        sourceImages: selectedImageReferences, // These can be image IDs or URLs
       },
       selectable: false,
     };
@@ -433,8 +439,9 @@ function Flow() {
       // Create image nodes for each dropped file
       imageFiles.forEach((file, index) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
-          const imageUrl = e.target?.result as string;
+        reader.onload = async (e) => {
+          const imageDataUrl = e.target?.result as string;
+          if (!imageDataUrl) return;
 
           // Calculate position with offset for multiple files
           const position = findNonOverlappingPosition(
@@ -445,20 +452,48 @@ function Flow() {
             'image-node',
           );
 
-          const newNodeId = `image-node-${uuidv4()}`;
-          const newNode: AppNode = {
-            id: newNodeId,
-            type: 'image-node',
-            position,
-            data: {
-              imageUrl,
-              isLoading: false,
-              prompt: `Uploaded: ${file.name}`,
-            },
-            selectable: true,
-          };
+          try {
+            // Store the image in optimized storage
+            const imageId = await imageService.storeImage(
+              imageDataUrl,
+              'uploaded',
+              {
+                // We could extract dimensions here if needed
+              },
+            );
 
-          setNodes((nds) => [...nds, newNode]);
+            const newNodeId = `image-node-${uuidv4()}`;
+            const newNode: AppNode = {
+              id: newNodeId,
+              type: 'image-node',
+              position,
+              data: {
+                imageId, // Use the stored image ID
+                isLoading: false,
+                prompt: `Uploaded: ${file.name}`,
+              },
+              selectable: true,
+            };
+
+            setNodes((nds) => [...nds, newNode]);
+          } catch (error) {
+            console.error('Error storing uploaded image:', error);
+            // Fallback to legacy storage for backward compatibility
+            const newNodeId = `image-node-${uuidv4()}`;
+            const newNode: AppNode = {
+              id: newNodeId,
+              type: 'image-node',
+              position,
+              data: {
+                imageUrl: imageDataUrl, // Fallback to direct URL storage
+                isLoading: false,
+                prompt: `Uploaded: ${file.name}`,
+              },
+              selectable: true,
+            };
+
+            setNodes((nds) => [...nds, newNode]);
+          }
         };
         reader.readAsDataURL(file);
       });
@@ -483,6 +518,33 @@ function Flow() {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isSelecting, selectedImageNodes, createEditNodeFromSelection]);
+
+  // Add clear all function
+  const clearAllData = useCallback(async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to clear all data? This will remove all nodes, edges, and images. API keys will be preserved. This action cannot be undone.',
+    );
+
+    if (confirmed) {
+      try {
+        // Clear all data from the database except API keys
+        await persistenceService.clearAll();
+        await db.images.clear();
+
+        // Reset the flow to initial state
+        setNodes([]);
+        setEdges([]);
+        setSelectedImageNodes([]);
+
+        alert(
+          'All data has been cleared successfully. API keys have been preserved.',
+        );
+      } catch (error) {
+        console.error('Error clearing data:', error);
+        alert('An error occurred while clearing data. Please try again.');
+      }
+    }
+  }, [setNodes, setEdges]);
 
   return (
     <div
@@ -518,7 +580,11 @@ function Flow() {
       >
         <Background />
         <MiniMap pannable zoomable />
-        <Controls />
+        <Controls>
+          <ControlButton onClick={clearAllData} title="Clear all data">
+            <Trash />
+          </ControlButton>
+        </Controls>
         <Panel position="top-left">
           <div className="flex items-center gap-3 mb-2">
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />

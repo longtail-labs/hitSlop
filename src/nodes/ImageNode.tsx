@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { BaseNode } from '@/components/base-node';
 import {
   NodeHeader,
@@ -15,17 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { imageService } from '@/services/database';
 
 // Define the expected data structure
 interface ImageNodeData {
-  imageUrl?: string;
+  imageId?: string; // New optimized storage
+  imageUrl?: string; // Legacy fallback
   isLoading?: boolean;
   error?: string;
   prompt?: string;
   revisedPrompt?: string;
-  isStreaming?: boolean;
-  partialImageUrl?: string;
-  streamingProgress?: string;
 }
 
 export function ImageNode({ data, selected, id }: NodeProps) {
@@ -36,12 +35,54 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     reactFlowInstance;
   const [isDoubleClicking, setIsDoubleClicking] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
+
+  // Load image data when component mounts or imageId changes
+  useEffect(() => {
+    const loadImage = async () => {
+      // If we have an imageId, load from optimized storage
+      if (nodeData.imageId) {
+        try {
+          const imageUrl = await imageService.getImage(nodeData.imageId);
+          if (imageUrl) {
+            setCurrentImageUrl(imageUrl);
+            setImageLoadError(null);
+          } else {
+            setImageLoadError('Image not found in storage');
+            // Fallback to legacy imageUrl if available
+            if (nodeData.imageUrl) {
+              setCurrentImageUrl(nodeData.imageUrl);
+              setImageLoadError(null);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading image:', error);
+          setImageLoadError('Failed to load image');
+          // Fallback to legacy imageUrl if available
+          if (nodeData.imageUrl) {
+            setCurrentImageUrl(nodeData.imageUrl);
+            setImageLoadError(null);
+          }
+        }
+      }
+      // Fallback to legacy imageUrl for backward compatibility
+      else if (nodeData.imageUrl) {
+        setCurrentImageUrl(nodeData.imageUrl);
+        setImageLoadError(null);
+      } else {
+        setCurrentImageUrl(null);
+      }
+    };
+
+    loadImage();
+  }, [nodeData.imageId, nodeData.imageUrl]);
 
   const handleDownload = () => {
-    if (nodeData.imageUrl) {
+    if (currentImageUrl) {
       // Create a temporary anchor element
       const link = document.createElement('a');
-      link.href = nodeData.imageUrl;
+      link.href = currentImageUrl;
       link.download = `ai-generated-image-${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
@@ -96,7 +137,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   );
 
   const handleDoubleClick = useCallback(() => {
-    if (!nodeData.imageUrl || isDoubleClicking) return;
+    if (!currentImageUrl || isDoubleClicking) return;
 
     setIsDoubleClicking(true);
 
@@ -120,13 +161,16 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const newNodeId = `prompt-node-${Date.now()}`;
 
     // Create a new prompt node with the current image as source
+    // Use imageId if available, otherwise fall back to imageUrl
+    const sourceImageReference = nodeData.imageId || currentImageUrl;
+
     const newNode = {
       id: newNodeId,
       type: 'prompt-node',
       position: newPosition,
       data: {
         prompt: '',
-        sourceImages: [nodeData.imageUrl],
+        sourceImages: [sourceImageReference],
       },
       selectable: false,
     };
@@ -156,7 +200,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setIsDoubleClicking(false);
   }, [
     id,
-    nodeData.imageUrl,
+    currentImageUrl,
+    nodeData.imageId,
     addNodes,
     addEdges,
     getNode,
@@ -167,11 +212,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   // Determine status class
   let statusClass = '';
-  if (nodeData.isLoading || nodeData.isStreaming) {
+  if (nodeData.isLoading) {
     statusClass = 'animate-pulse border-2 border-blue-400';
-  } else if (nodeData.error) {
+  } else if (nodeData.error || imageLoadError) {
     statusClass = 'border-2 border-destructive';
-  } else if (nodeData.imageUrl) {
+  } else if (currentImageUrl) {
     statusClass = 'border-2 border-green-500';
   }
 
@@ -189,7 +234,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </NodeHeaderIcon>
           <NodeHeaderTitle>Generated Image</NodeHeaderTitle>
           <NodeHeaderActions>
-            {nodeData.imageUrl && (
+            {currentImageUrl && (
               <>
                 <button
                   onClick={() => setIsDialogOpen(true)}
@@ -212,43 +257,24 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         </NodeHeader>
 
         <div className="image-node-content" onDoubleClick={handleDoubleClick}>
-          {nodeData.isLoading || nodeData.isStreaming ? (
+          {nodeData.isLoading ? (
             <div className="p-5 text-center min-h-[150px] flex flex-col justify-center items-center">
-              {nodeData.partialImageUrl ? (
-                // Show partial image during streaming
-                <div className="relative w-full">
-                  <img
-                    src={nodeData.partialImageUrl}
-                    alt="Partial AI image"
-                    className="max-w-full rounded opacity-75"
-                  />
-                  <div className="absolute inset-0 bg-blue-500/10 rounded flex items-center justify-center">
-                    <div className="bg-white/90 px-3 py-1 rounded-full text-xs font-medium text-blue-600">
-                      {nodeData.streamingProgress || 'Generating...'}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                // Show loading spinner when no partial image yet
-                <>
-                  <div className="rounded-full bg-blue-500/20 w-10 h-10 mb-3 animate-spin border-2 border-blue-500 border-t-transparent"></div>
-                  <div className="text-sm text-muted-foreground">
-                    {nodeData.streamingProgress || 'Generating image...'}
-                  </div>
-                  <div className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis">
-                    {nodeData.prompt
-                      ? `"${String(nodeData.prompt).substring(0, 50)}${
-                          String(nodeData.prompt).length > 50 ? '...' : ''
-                        }"`
-                      : ''}
-                  </div>
-                </>
-              )}
+              <div className="rounded-full bg-blue-500/20 w-10 h-10 mb-3 animate-spin border-2 border-blue-500 border-t-transparent"></div>
+              <div className="text-sm text-muted-foreground">
+                Generating image...
+              </div>
+              <div className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis">
+                {nodeData.prompt
+                  ? `"${String(nodeData.prompt).substring(0, 50)}${
+                      String(nodeData.prompt).length > 50 ? '...' : ''
+                    }"`
+                  : ''}
+              </div>
             </div>
-          ) : nodeData.imageUrl ? (
+          ) : currentImageUrl ? (
             <div>
               <img
-                src={nodeData.imageUrl}
+                src={currentImageUrl}
                 alt="Generated AI image"
                 className="max-w-full rounded"
               />
@@ -260,10 +286,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   </div>
                 )}
             </div>
-          ) : nodeData.error ? (
+          ) : nodeData.error || imageLoadError ? (
             <div className="p-5 text-center bg-destructive/10 rounded-sm m-2 text-destructive min-h-[100px] flex flex-col justify-center">
               <div className="font-medium mb-1">Generation Failed</div>
-              <div className="text-xs">{nodeData.error}</div>
+              <div className="text-xs">{nodeData.error || imageLoadError}</div>
             </div>
           ) : (
             <div className="p-5 text-center bg-muted rounded m-2 text-muted-foreground">
@@ -275,7 +301,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       <Handle type="source" position={Position.Bottom} id="output" />
 
       {/* Fullscreen Image Dialog */}
-      {nodeData.imageUrl && (
+      {currentImageUrl && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-[90vw] max-h-[90vh] p-0">
             <DialogHeader className="p-4 flex-row items-center justify-between border-b">
@@ -292,7 +318,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             </DialogHeader>
             <div className="overflow-hidden p-4 flex items-center justify-center h-[calc(90vh-120px)]">
               <img
-                src={nodeData.imageUrl}
+                src={currentImageUrl}
                 alt="Generated AI image (full size)"
                 className="object-contain w-auto h-auto max-w-[calc(90vw-32px)] max-h-[calc(90vh-140px)]"
               />

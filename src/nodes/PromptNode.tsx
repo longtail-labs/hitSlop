@@ -17,6 +17,7 @@ import {
 } from '@/components/node-header';
 import { ImageIcon, Upload, X } from 'lucide-react';
 import { ModelParameterControls } from '../components/ModelParameterControls';
+import { imageService } from '@/services/database';
 
 export function PromptNode({ data, id, selected }: NodeProps) {
   const reactFlowInstance = useReactFlow();
@@ -41,6 +42,9 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   );
   const [error, setError] = useState<string | null>(null);
 
+  // State for displaying source images (resolved to data URLs for rendering)
+  const [displayImageUrls, setDisplayImageUrls] = useState<string[]>([]);
+
   // Dynamic model parameters
   const [modelParams, setModelParams] = useState<Record<string, any>>(() => {
     const config = getModelConfig(model);
@@ -59,80 +63,78 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     return initialParams;
   });
 
-  // Update model parameters when model changes
+  // Resolve source images to display URLs when sourceImages changes
   useEffect(() => {
-    const config = getModelConfig(model);
-    if (config) {
-      setModelParams((prevParams) => {
-        const newParams: Record<string, any> = {
-          size: config.defaultSize,
-          n: Math.min(prevParams.n || 1, config.maxImages),
-        };
+    const resolveDisplayImages = async () => {
+      const resolvedUrls: string[] = [];
 
-        // Set default values from model config
-        config.parameters.forEach((param) => {
-          if (param.default !== undefined) {
-            newParams[param.name] = param.default;
+      for (const imageRef of sourceImages) {
+        if (imageRef.startsWith('data:')) {
+          // Already a data URL
+          resolvedUrls.push(imageRef);
+        } else {
+          // Assume it's an image ID, try to resolve
+          try {
+            const imageUrl = await imageService.getImage(imageRef);
+            if (imageUrl) {
+              resolvedUrls.push(imageUrl);
+            } else {
+              console.warn(`Image ID ${imageRef} not found in storage`);
+            }
+          } catch (error) {
+            console.error(`Error resolving image ID ${imageRef}:`, error);
           }
-        });
-        return newParams;
-      });
+        }
+      }
+
+      setDisplayImageUrls(resolvedUrls);
+    };
+
+    if (sourceImages.length > 0) {
+      resolveDisplayImages();
+    } else {
+      setDisplayImageUrls([]);
     }
-  }, [model]);
+  }, [sourceImages]);
 
-  // Node dimensions for collision detection
-  const IMAGE_NODE_DIMENSIONS = { width: 300, height: 300 };
-
-  // Find a non-overlapping position for new image nodes
   const findNonOverlappingPosition = useCallback(
-    (initialPosition: { x: number; y: number }, index: number) => {
-      // Create a temporary node to check for intersections
-      const tempNode = {
+    (basePosition: { x: number; y: number }, index: number) => {
+      const offset = index * 50; // Offset each image by 50px
+      let position = {
+        x: basePosition.x + offset,
+        y: basePosition.y,
+      };
+
+      let tempNode = {
         id: 'temp',
-        position: initialPosition,
-        width: IMAGE_NODE_DIMENSIONS.width,
-        height: IMAGE_NODE_DIMENSIONS.height,
+        position,
+        width: 300,
+        height: 300,
       };
 
-      let position = { ...initialPosition };
+      // Check if the position causes overlap
+      let intersections = getIntersectingNodes(tempNode);
 
-      // Arrange nodes in a grid pattern with spacing
-      const gridColumns = 2; // Number of columns in the grid
-      const horizontalSpacing = IMAGE_NODE_DIMENSIONS.width + 50;
-      const verticalSpacing = IMAGE_NODE_DIMENSIONS.height + 50;
-
-      // Calculate row and column based on index
-      const column = index % gridColumns;
-      const row = Math.floor(index / gridColumns);
-
-      // Calculate initial grid position
-      position = {
-        x: initialPosition.x + column * horizontalSpacing,
-        y: initialPosition.y + row * verticalSpacing,
-      };
-
-      // Check if this position causes overlaps
-      let tempNodeAtPosition = { ...tempNode, position };
-      let intersections = getIntersectingNodes(tempNodeAtPosition);
-
-      // If there are intersections, try to find a better position with a spiral pattern
+      // If there are intersections, try to find a better position
       if (intersections.length > 0) {
+        // Try different positions in a spiral pattern
         const spiralStep = 100;
         let attempts = 0;
         let angle = 0;
         let radius = spiralStep;
 
-        while (intersections.length > 0 && attempts < 30) {
+        while (intersections.length > 0 && attempts < 50) {
+          // Move in a spiral pattern
           angle += 0.5;
           radius = spiralStep * (1 + angle / 10);
 
           position = {
-            x: initialPosition.x + radius * Math.cos(angle),
-            y: initialPosition.y + radius * Math.sin(angle),
+            x: basePosition.x + radius * Math.cos(angle),
+            y: basePosition.y + radius * Math.sin(angle),
           };
 
-          tempNodeAtPosition = { ...tempNode, position };
-          intersections = getIntersectingNodes(tempNodeAtPosition);
+          tempNode = { ...tempNode, position };
+          intersections = getIntersectingNodes(tempNode);
           attempts++;
         }
       }
@@ -168,13 +170,26 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Process each file and add to existing images
+    // Process each file and store in optimized storage
     const filesToProcess = Array.from(files).slice(0, 16); // Max 16 images
     filesToProcess.forEach((file) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const base64String = reader.result as string;
-        setSourceImages((prev) => [...prev, base64String]);
+        if (!base64String) return;
+
+        try {
+          // Store the image in optimized storage and get the ID
+          const imageId = await imageService.storeImage(
+            base64String,
+            'uploaded',
+          );
+          setSourceImages((prev) => [...prev, imageId]);
+        } catch (error) {
+          console.error('Error storing uploaded image:', error);
+          // Fallback to storing the data URL directly
+          setSourceImages((prev) => [...prev, base64String]);
+        }
       };
       reader.readAsDataURL(file);
     });
@@ -226,8 +241,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           type: 'image-node',
           position: nonOverlappingPosition,
           data: {
-            isLoading: model !== 'gpt-image-1', // No loading state for GPT Image 1 (has streaming)
-            isStreaming: model === 'gpt-image-1', // Auto-enable streaming for GPT Image 1
+            isLoading: true,
             prompt: prompt,
           },
         };
@@ -247,42 +261,8 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       const params = {
         prompt,
         model,
-        sourceImages: sourceImages.length > 0 ? sourceImages : undefined,
+        sourceImages: sourceImages.length > 0 ? sourceImages : undefined, // These can be IDs or URLs
         ...modelParams,
-        // Streaming callbacks
-        onPartialImageUpdate: (nodeId: string, partialImageUrl: string) => {
-          setNodes((nodes) =>
-            nodes.map((node) => {
-              if (node.id === nodeId) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    partialImageUrl,
-                    isStreaming: true,
-                  },
-                };
-              }
-              return node;
-            }),
-          );
-        },
-        onProgressUpdate: (nodeId: string, status: string) => {
-          setNodes((nodes) =>
-            nodes.map((node) => {
-              if (node.id === nodeId) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    streamingProgress: status,
-                  },
-                };
-              }
-              return node;
-            }),
-          );
-        },
       };
 
       // Create a serializable version of params without callback functions
@@ -321,15 +301,6 @@ export function PromptNode({ data, id, selected }: NodeProps) {
                 data: {
                   ...finalImageData,
                   isLoading: false,
-                  isStreaming: false,
-                  partialImageUrl:
-                    finalImageData.partialImageUrl === undefined
-                      ? undefined
-                      : finalImageData.partialImageUrl,
-                  streamingProgress:
-                    finalImageData.streamingProgress === undefined
-                      ? undefined
-                      : finalImageData.streamingProgress,
                 },
               };
             }
@@ -406,7 +377,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         </NodeHeader>
 
         <div className="p-2">
-          {/* Dynamic Model Parameters with Model Selection */}
+          {/* Model Parameter Controls */}
           <ModelParameterControls
             modelId={model}
             currentParams={modelParams}
@@ -417,7 +388,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
             onModelChange={setModel}
           />
 
-          {/* Main Prompt Input with buttons inside */}
+          {/* Prompt Input */}
           <div className="relative">
             <textarea
               ref={textareaRef}
@@ -466,10 +437,10 @@ export function PromptNode({ data, id, selected }: NodeProps) {
             <div className="text-sm text-destructive mb-2">{error}</div>
           )}
 
-          {/* Source Images Display */}
-          {sourceImages.length > 0 && (
+          {/* Source Images Display - using resolved display URLs */}
+          {displayImageUrls.length > 0 && (
             <div className="flex flex-wrap gap-1.5 bg-muted p-1.5 rounded">
-              {sourceImages.map((img, index) => (
+              {displayImageUrls.map((img, index) => (
                 <div key={index} className="relative w-12 h-12">
                   <img
                     src={img}
@@ -484,7 +455,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
                   </button>
                 </div>
               ))}
-              {sourceImages.length > 0 && (
+              {displayImageUrls.length > 0 && (
                 <button
                   onClick={clearImages}
                   className="nodrag bg-muted-foreground/20 border-none cursor-pointer text-muted-foreground px-1.5 py-0.5 rounded text-xs self-start"

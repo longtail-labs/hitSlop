@@ -25,17 +25,35 @@ export interface ApiKey {
   updatedAt: Date;
 }
 
+// New interface for optimized image storage
+export interface StoredImage {
+  id: string;
+  imageData: string; // Base64 data URL - stored but NOT indexed
+  mimeType: string;
+  size: number; // File size in bytes for reference
+  createdAt: Date;
+  // Optional metadata that CAN be indexed
+  width?: number;
+  height?: number;
+  source?: 'generated' | 'uploaded' | 'edited';
+  tags?: string[]; // For AI-analyzed tags if we add that feature later
+}
+
 export class FlowDatabase extends Dexie {
   nodes!: Table<PersistedNode>;
   edges!: Table<PersistedEdge>;
   apiKeys!: Table<ApiKey>;
+  images!: Table<StoredImage>;
 
   constructor() {
     super('FlowDatabase');
-    this.version(2).stores({
+    // Increment version to 3 to add the images table
+    this.version(3).stores({
       nodes: 'id, type, position, data, selectable',
       edges: 'id, source, target, sourceHandle, targetHandle',
-      apiKeys: 'id, provider, key, createdAt, updatedAt'
+      apiKeys: 'id, provider, key, createdAt, updatedAt',
+      // Images table: only index metadata, NOT the imageData itself
+      images: 'id, mimeType, size, createdAt, width, height, source, *tags'
     });
   }
 }
@@ -100,5 +118,121 @@ export const apiKeyService = {
   async hasApiKey(provider: string): Promise<boolean> {
     const key = await this.getApiKey(provider);
     return key !== null && key.trim() !== '';
+  }
+};
+
+// New optimized image service
+export const imageService = {
+  /**
+   * Store an image and return its ID
+   * @param imageDataUrl Base64 data URL of the image
+   * @param source Source of the image (generated, uploaded, edited)
+   * @param metadata Optional metadata like dimensions
+   * @returns Promise<string> The image ID
+   */
+  async storeImage(
+    imageDataUrl: string,
+    source: 'generated' | 'uploaded' | 'edited' = 'generated',
+    metadata?: { width?: number; height?: number; tags?: string[] }
+  ): Promise<string> {
+    const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Extract MIME type from data URL
+    const mimeMatch = imageDataUrl.match(/^data:([^;]+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+
+    // Calculate approximate size (base64 is ~33% larger than binary)
+    const base64Data = imageDataUrl.split(',')[1] || '';
+    const approximateSize = Math.floor(base64Data.length * 0.75);
+
+    const storedImage: StoredImage = {
+      id: imageId,
+      imageData: imageDataUrl,
+      mimeType,
+      size: approximateSize,
+      createdAt: new Date(),
+      source,
+      ...metadata
+    };
+
+    await db.images.put(storedImage);
+    return imageId;
+  },
+
+  /**
+   * Retrieve an image by its ID
+   * @param imageId The image ID
+   * @returns Promise<string | null> The image data URL or null if not found
+   */
+  async getImage(imageId: string): Promise<string | null> {
+    const storedImage = await db.images.get(imageId);
+    return storedImage?.imageData || null;
+  },
+
+  /**
+   * Retrieve image metadata without the binary data
+   * @param imageId The image ID
+   * @returns Promise<Omit<StoredImage, 'imageData'> | null>
+   */
+  async getImageMetadata(imageId: string): Promise<Omit<StoredImage, 'imageData'> | null> {
+    const storedImage = await db.images.get(imageId);
+    if (!storedImage) return null;
+
+    const metadata = Object.fromEntries(
+      Object.entries(storedImage).filter(([key]) => key !== 'imageData')
+    ) as Omit<StoredImage, 'imageData'>;
+    return metadata;
+  },
+
+  /**
+   * Delete an image by its ID
+   * @param imageId The image ID
+   * @returns Promise<void>
+   */
+  async deleteImage(imageId: string): Promise<void> {
+    await db.images.delete(imageId);
+  },
+
+  /**
+   * Get all image metadata (useful for debugging/management)
+   * @returns Promise<Omit<StoredImage, 'imageData'>[]>
+   */
+  async getAllImageMetadata(): Promise<Omit<StoredImage, 'imageData'>[]> {
+    const images = await db.images.toArray();
+    return images.map(img => {
+      const metadata = Object.fromEntries(
+        Object.entries(img).filter(([key]) => key !== 'imageData')
+      ) as Omit<StoredImage, 'imageData'>;
+      return metadata;
+    });
+  },
+
+  /**
+   * Clean up orphaned images (images not referenced by any nodes)
+   * @param nodeImageIds Array of image IDs currently referenced by nodes
+   * @returns Promise<number> Number of images deleted
+   */
+  async cleanupOrphanedImages(nodeImageIds: string[]): Promise<number> {
+    const allImages = await db.images.toArray();
+    const orphanedImages = allImages.filter(img => !nodeImageIds.includes(img.id));
+
+    for (const orphanedImage of orphanedImages) {
+      await db.images.delete(orphanedImage.id);
+    }
+
+    return orphanedImages.length;
+  },
+
+  /**
+   * Get total storage usage of images
+   * @returns Promise<{count: number, totalSize: number}>
+   */
+  async getStorageStats(): Promise<{ count: number, totalSize: number }> {
+    const images = await db.images.toArray();
+    const totalSize = images.reduce((sum, img) => sum + (img.size || 0), 0);
+    return {
+      count: images.length,
+      totalSize
+    };
   }
 };
