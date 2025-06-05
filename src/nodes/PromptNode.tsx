@@ -228,7 +228,9 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       const newNodeIds: string[] = [];
 
       for (let i = 0; i < numImages; i++) {
-        const imageNodeId = `image-node-${Date.now()}-${i}`;
+        const imageNodeId = `image-node-${Date.now()}-${i}-${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
         newNodeIds.push(imageNodeId);
 
         const nonOverlappingPosition = findNonOverlappingPosition(
@@ -249,8 +251,9 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         loadingImageNodes.push(loadingImageNode);
         addNodes(loadingImageNode);
 
+        const edgeId = `edge-${id}-to-${imageNodeId}`;
         addEdges({
-          id: `edge-${id}-to-${imageNodeId}`,
+          id: edgeId,
           source: id,
           target: imageNodeId,
           sourceHandle: 'output',

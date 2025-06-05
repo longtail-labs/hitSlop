@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { apiKeyService } from '@/services/database';
 import { resetOpenAIClient } from '@/services/providers/openai';
 import { resetGoogleClient } from '@/services/providers/google';
+import { resetFalClient } from '@/services/providers/fal';
 
 interface ApiKeyDialogProps {
   open?: boolean;
@@ -28,6 +29,7 @@ export function ApiKeyDialog({
 }: ApiKeyDialogProps) {
   const [openaiKey, setOpenaiKey] = useState('');
   const [googleKey, setGoogleKey] = useState('');
+  const [falKey, setFalKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingKeys, setIsLoadingKeys] = useState(true);
 
@@ -43,6 +45,7 @@ export function ApiKeyDialog({
       const keys = await apiKeyService.getAllApiKeys();
       setOpenaiKey(keys.openai || '');
       setGoogleKey(keys.google || '');
+      setFalKey(keys.fal || '');
     } catch (error) {
       console.error('Failed to load API keys:', error);
     } finally {
@@ -65,6 +68,13 @@ export function ApiKeyDialog({
         resetGoogleClient();
       } else {
         await apiKeyService.deleteApiKey('google');
+      }
+
+      if (falKey.trim()) {
+        await apiKeyService.saveApiKey('fal', falKey.trim());
+        resetFalClient();
+      } else {
+        await apiKeyService.deleteApiKey('fal');
       }
 
       onOpenChange?.(false);
@@ -104,6 +114,17 @@ export function ApiKeyDialog({
             placeholder="Enter Google API key"
             value={googleKey}
             onChange={(e) => setGoogleKey(e.target.value)}
+            disabled={isLoadingKeys}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="fal-key">FAL API Key</Label>
+          <Input
+            id="fal-key"
+            type="password"
+            placeholder="Enter FAL API key"
+            value={falKey}
+            onChange={(e) => setFalKey(e.target.value)}
             disabled={isLoadingKeys}
           />
         </div>

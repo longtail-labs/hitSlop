@@ -157,8 +157,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     // Find a non-overlapping position
     const newPosition = findNonOverlappingPosition(initialPosition);
 
-    // Generate a unique ID with timestamp to avoid conflicts
-    const newNodeId = `prompt-node-${Date.now()}`;
+    // Generate a unique ID with timestamp and random component to avoid conflicts
+    const newNodeId = `prompt-node-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
 
     // Create a new prompt node with the current image as source
     // Use imageId if available, otherwise fall back to imageUrl
@@ -179,8 +181,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     addNodes(newNode);
 
     // Create an edge connecting the image node to the new prompt node
+    const edgeId = `edge-${id}-to-${newNodeId}`;
     addEdges({
-      id: `edge-${id}-to-${newNodeId}`,
+      id: edgeId,
       source: id,
       target: newNodeId,
       sourceHandle: 'output',
