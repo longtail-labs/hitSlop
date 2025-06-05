@@ -590,8 +590,8 @@ function Flow() {
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
             <h1>hitSlop</h1>
           </div>
-          <h3>Cursor for creating graphics,</h3>
-          <p>using OpenAI's new Image gen API & Gemini</p>
+          <h3>Image Gen Playground</h3>
+          <p>using OpenAI's new Image gen API, Gemini, and FLUX Kontext</p>
         </Panel>
         <Panel position="top-right">
           <div className="flex gap-2">

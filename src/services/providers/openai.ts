@@ -48,15 +48,41 @@ export interface ImageResult {
  * Convert data URL to File object for OpenAI API
  */
 function dataUrlToFile(dataUrl: string, filename: string = 'image.png'): File {
-  const arr = dataUrl.split(',');
-  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
+  // Validate data URL format
+  if (!dataUrl.startsWith('data:')) {
+    throw new Error(`Invalid data URL format: Expected data URL but got: ${dataUrl.substring(0, 50)}...`);
   }
-  return new File([u8arr], filename, { type: mime });
+
+  const arr = dataUrl.split(',');
+  if (arr.length !== 2) {
+    throw new Error(`Invalid data URL format: Missing comma separator in data URL`);
+  }
+
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+  const base64Data = arr[1];
+
+  // Validate base64 string
+  if (!base64Data || base64Data.length === 0) {
+    throw new Error(`Invalid data URL format: Empty base64 data`);
+  }
+
+  // Check for invalid base64 characters
+  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+  if (!base64Regex.test(base64Data)) {
+    throw new Error(`Invalid data URL format: Base64 string contains invalid characters`);
+  }
+
+  try {
+    const bstr = atob(base64Data);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  } catch (error) {
+    throw new Error(`Failed to decode base64 data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 /**
@@ -78,9 +104,14 @@ export const generateWithOpenAI = async (params: OpenAIImageParams): Promise<Ima
 
     if (isEditOperation) {
       // Use Images Edit API
-      const images = params.sourceImages!.map((dataUrl, index) =>
-        dataUrlToFile(dataUrl, `source-${index}.png`)
-      );
+      const images = params.sourceImages!.map((dataUrl, index) => {
+        try {
+          return dataUrlToFile(dataUrl, `source-${index}.png`);
+        } catch (error) {
+          console.error(`Error processing source image ${index}:`, error);
+          throw new Error(`Failed to process source image ${index}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      });
 
       const editParams: any = {
         model: params.model,

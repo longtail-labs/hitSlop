@@ -1,4 +1,4 @@
-export type ModelProvider = 'openai' | 'google';
+export type ModelProvider = 'openai' | 'google' | 'fal';
 
 export type ModelCapability =
   | 'generation'
@@ -31,7 +31,7 @@ export interface ModelConfig {
   maxImages: number;
   defaultSize: string;
   supportedSizes: string[];
-  apiEndpoint: 'image' | 'responses' | 'gemini' | 'imagen';
+  apiEndpoint: 'image' | 'responses' | 'gemini' | 'imagen' | 'fal';
   costTier: 'low' | 'medium' | 'high';
   avgLatency: 'fast' | 'medium' | 'slow';
 }
@@ -184,6 +184,43 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
     apiEndpoint: 'gemini',
     costTier: 'medium',
     avgLatency: 'fast'
+  },
+
+  'flux-kontext-auto': {
+    id: 'flux-kontext-auto',
+    name: 'FLUX.1 Kontext Pro',
+    provider: 'fal',
+    description: 'Intelligent FLUX model that switches between text-to-image generation, single image editing, and multi-image editing based on context',
+    capabilities: ['generation', 'editing', 'high_quality', 'aspect_ratios'],
+    parameters: [
+      {
+        name: 'guidance_scale',
+        type: 'number',
+        default: 3.5,
+        label: 'Guidance Scale',
+        description: 'How closely the model should follow your prompt (1-20)'
+      },
+      {
+        name: 'aspect_ratio',
+        type: 'select',
+        options: ['21:9', '16:9', '4:3', '3:2', '1:1', '2:3', '3:4', '9:16', '9:21'],
+        default: '1:1',
+        label: 'Aspect Ratio',
+        description: 'Image aspect ratio'
+      },
+      {
+        name: 'seed',
+        type: 'number',
+        label: 'Seed',
+        description: 'Random seed for reproducible results (optional)'
+      }
+    ],
+    maxImages: 10, // Increased to support multi-image editing
+    defaultSize: '1024x1024',
+    supportedSizes: ['1024x1024'],
+    apiEndpoint: 'fal',
+    costTier: 'high',
+    avgLatency: 'medium'
   }
 };
 

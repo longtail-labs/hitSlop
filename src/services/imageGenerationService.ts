@@ -1,6 +1,7 @@
 import { AppNode, SerializableGenerationParams } from '../nodes/types';
 import { generateWithOpenAI } from './providers/openai';
 import { generateWithGoogle } from './providers/google';
+import { generateWithFal } from './providers/fal';
 import { getModelConfig, validateModelParameters, MODEL_CONFIGS } from './models/modelConfig';
 import { imageService } from './database';
 
@@ -36,13 +37,64 @@ async function resolveImageReferences(imageReferences?: string[]): Promise<strin
   for (const reference of imageReferences) {
     // Check if it's already a data URL
     if (reference.startsWith('data:')) {
-      resolvedImages.push(reference);
+      // Validate the data URL format before adding
+      try {
+        const arr = reference.split(',');
+        if (arr.length === 2 && arr[1] && arr[1].length > 0) {
+          // Basic validation that this looks like a valid data URL
+          const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+          if (base64Regex.test(arr[1])) {
+            resolvedImages.push(reference);
+          } else {
+            console.warn(`Invalid base64 data in data URL: ${reference.substring(0, 100)}...`);
+          }
+        } else {
+          console.warn(`Invalid data URL format: ${reference.substring(0, 100)}...`);
+        }
+      } catch (error) {
+        console.warn(`Error validating data URL: ${reference.substring(0, 100)}...`, error);
+      }
     } else {
       // Assume it's an image ID, try to resolve it
       try {
         const imageUrl = await imageService.getImage(reference);
         if (imageUrl) {
-          resolvedImages.push(imageUrl);
+          // Validate the resolved image URL too
+          if (imageUrl.startsWith('data:')) {
+            const arr = imageUrl.split(',');
+            if (arr.length === 2 && arr[1] && arr[1].length > 0) {
+              const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+              if (base64Regex.test(arr[1])) {
+                resolvedImages.push(imageUrl);
+              } else {
+                console.warn(`Invalid base64 data in resolved image URL for ID ${reference}: ${imageUrl.substring(0, 100)}...`);
+              }
+            } else {
+              console.warn(`Invalid data URL format in resolved image for ID ${reference}: ${imageUrl.substring(0, 100)}...`);
+            }
+          } else {
+            // If it's not a data URL, it's likely a regular URL - convert it to base64
+            console.log(`Resolved image ID ${reference} to URL, converting to base64: ${imageUrl}`);
+            try {
+              const response = await fetch(imageUrl);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch image from URL: ${response.statusText}`);
+              }
+
+              const arrayBuffer = await response.arrayBuffer();
+              const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+              const mimeType = response.headers.get('content-type') || 'image/png';
+              const dataUrl = `data:${mimeType};base64,${base64}`;
+
+              resolvedImages.push(dataUrl);
+              console.log(`Successfully converted resolved URL to base64: ${dataUrl.substring(0, 50)}...`);
+            } catch (error) {
+              console.error(`Failed to convert resolved URL to base64:`, error);
+              // As a fallback, still include the URL but warn about it
+              console.warn(`Using URL directly (may cause issues with some providers): ${imageUrl}`);
+              resolvedImages.push(imageUrl);
+            }
+          }
         } else {
           console.warn(`Image ID ${reference} not found in storage`);
         }
@@ -76,6 +128,7 @@ export const processImageOperation = async (
 
     // Resolve image references to data URLs for API calls
     const sourceImageUrls = await resolveImageReferences(params.sourceImages);
+
     const maskImageUrl = params.maskImage ? (await resolveImageReferences([params.maskImage]))[0] : undefined;
 
     // Validate parameters for this model
@@ -123,6 +176,47 @@ export const processImageOperation = async (
       };
 
       result = await generateWithGoogle(googleParams);
+    } else if (modelConfig.provider === 'fal') {
+      // Handle automatic model switching for flux-kontext-auto
+      let actualModelId = modelId;
+      if (modelId === 'flux-kontext-auto') {
+        // Switch based on number of source images
+        if (!sourceImageUrls || sourceImageUrls.length === 0) {
+          // No source images = text-to-image generation
+          actualModelId = 'fal-ai/flux-pro/kontext/text-to-image';
+        } else if (sourceImageUrls.length === 1) {
+          // Single source image = single image editing
+          actualModelId = 'fal-ai/flux-pro/kontext';
+        } else {
+          // Multiple source images = multi-image editing
+          actualModelId = 'fal-ai/flux-pro/kontext/max/multi';
+        }
+
+        console.log(`FAL model selection: ${sourceImageUrls?.length || 0} source images -> ${actualModelId}`);
+      }
+
+      // Prepare FAL-specific parameters
+      const falParams: any = {
+        prompt: params.prompt,
+        model: actualModelId,
+        guidance_scale: params.guidance_scale,
+        num_images: params.n,
+        safety_tolerance: params.safety_tolerance,
+        output_format: params.output_format,
+        aspect_ratio: params.aspect_ratio,
+        seed: params.seed,
+      };
+
+      // Add image parameters based on the model
+      if (actualModelId === 'fal-ai/flux-pro/kontext/max/multi' && sourceImageUrls && sourceImageUrls.length > 1) {
+        // Multi-image editing
+        falParams.image_urls = sourceImageUrls;
+      } else if (sourceImageUrls && sourceImageUrls.length > 0) {
+        // Single image editing or first image for single-image models
+        falParams.image_url = sourceImageUrls[0];
+      }
+
+      result = await generateWithFal(falParams);
     } else {
       return {
         success: false,
