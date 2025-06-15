@@ -113,6 +113,33 @@ function Flow() {
   const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
   const [nodesToFocus, setNodesToFocus] = useState<string | null>(null);
 
+  // Request persistent storage to prevent data loss
+  useEffect(() => {
+    const requestPersistence = async () => {
+      console.log('Requesting storage persistence');
+      if (navigator.storage && navigator.storage.persist) {
+        console.log('Storage API is available');
+        try {
+          const isPersisted = await navigator.storage.persisted();
+          if (!isPersisted) {
+            const result = await navigator.storage.persist();
+            if (result) {
+              console.log('Storage persistence granted.');
+            } else {
+              console.warn(
+                'Storage persistence not granted. Data may be cleared by the browser.',
+              );
+            }
+          }
+        } catch (error) {
+          console.error('Error requesting storage persistence:', error);
+        }
+      }
+    };
+
+    requestPersistence();
+  }, []);
+
   // Load persisted data on mount
   useEffect(() => {
     const loadPersistedData = async () => {
