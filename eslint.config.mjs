@@ -1,5 +1,6 @@
 import { defineConfig } from 'eslint/config';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import js from '@eslint/js';
@@ -36,6 +37,7 @@ export default defineConfig([
     plugins: {
       '@typescript-eslint': tsPlugin,
       'react-refresh': reactRefresh,
+      'react-hooks': reactHooks,
     },
     languageOptions: {
       parser: tsParser,
@@ -60,6 +62,8 @@ export default defineConfig([
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
 ]);

@@ -18,6 +18,7 @@ import {
 import { ImageIcon, Upload, X } from 'lucide-react';
 import { ModelParameterControls } from '../components/ModelParameterControls';
 import { imageService } from '@/services/database';
+import { createNodeId, createEdgeId } from '@/lib/utils';
 
 export function PromptNode({ data, id, selected }: NodeProps) {
   const reactFlowInstance = useReactFlow();
@@ -228,9 +229,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       const newNodeIds: string[] = [];
 
       for (let i = 0; i < numImages; i++) {
-        const imageNodeId = `image-node-${Date.now()}-${i}-${Math.random()
-          .toString(36)
-          .substr(2, 9)}`;
+        const imageNodeId = createNodeId('image-node');
         newNodeIds.push(imageNodeId);
 
         const nonOverlappingPosition = findNonOverlappingPosition(
@@ -251,7 +250,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         loadingImageNodes.push(loadingImageNode);
         addNodes(loadingImageNode);
 
-        const edgeId = `edge-${id}-to-${imageNodeId}`;
+        const edgeId = createEdgeId(id, imageNodeId);
         addEdges({
           id: edgeId,
           source: id,

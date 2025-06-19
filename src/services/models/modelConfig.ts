@@ -63,7 +63,7 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
         name: 'background',
         type: 'select',
         options: ['auto', 'transparent', 'opaque'],
-        default: 'auto',
+        default: 'opaque',
         label: 'Background',
         description: 'Background type'
       }

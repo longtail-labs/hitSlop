@@ -1,4 +1,10 @@
-import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
+import {
+  Handle,
+  Position,
+  type NodeProps,
+  useReactFlow,
+  NodeToolbar,
+} from '@xyflow/react';
 import { useState, useCallback, useEffect } from 'react';
 import { BaseNode } from '@/components/base-node';
 import {
@@ -8,14 +14,16 @@ import {
   NodeHeaderActions,
   NodeHeaderDeleteAction,
 } from '@/components/node-header';
-import { ImageIcon, Download, Maximize } from 'lucide-react';
+import { ImageIcon, Download, Maximize, Copy, Edit3 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Menubar, MenubarMenu, MenubarTrigger } from '@/components/ui/menubar';
 import { imageService } from '@/services/database';
+import { createNodeId, createEdgeId } from '@/lib/utils';
 
 // Define the expected data structure
 interface ImageNodeData {
@@ -33,7 +41,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const reactFlowInstance = useReactFlow();
   const { addNodes, addEdges, getNode, getIntersectingNodes, fitView } =
     reactFlowInstance;
-  const [isDoubleClicking, setIsDoubleClicking] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
@@ -136,17 +143,63 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     [getIntersectingNodes],
   );
 
-  const handleDoubleClick = useCallback(() => {
-    if (!currentImageUrl || isDoubleClicking) return;
-
-    setIsDoubleClicking(true);
+  const handleDuplicate = useCallback(() => {
+    if (!currentImageUrl) return;
 
     // Get the current node position
     const currentNode = getNode(id);
-    if (!currentNode) {
-      setIsDoubleClicking(false);
-      return;
-    }
+    if (!currentNode) return;
+
+    // Create base position for new node (to the right of the current node)
+    const initialPosition = {
+      x: currentNode.position.x + 350, // Place it to the right with spacing
+      y: currentNode.position.y,
+    };
+
+    // Find a non-overlapping position
+    const newPosition = findNonOverlappingPosition(initialPosition);
+
+    // Generate a unique ID
+    const newNodeId = createNodeId('image-node');
+
+    // Create a new image node with the same data
+    const newNode = {
+      id: newNodeId,
+      type: 'image-node',
+      position: newPosition,
+      data: {
+        ...nodeData, // Copy all existing data
+      },
+    };
+
+    // Add the new node to the flow
+    addNodes(newNode);
+
+    // Focus on the newly created node
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: newNodeId }],
+        duration: 500,
+        padding: 1.8,
+        maxZoom: 0.8,
+      });
+    }, 100);
+  }, [
+    id,
+    currentImageUrl,
+    nodeData,
+    addNodes,
+    getNode,
+    findNonOverlappingPosition,
+    fitView,
+  ]);
+
+  const handleEdit = useCallback(() => {
+    if (!currentImageUrl) return;
+
+    // Get the current node position
+    const currentNode = getNode(id);
+    if (!currentNode) return;
 
     // Create base position for new node (below the current node)
     const initialPosition = {
@@ -157,10 +210,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     // Find a non-overlapping position
     const newPosition = findNonOverlappingPosition(initialPosition);
 
-    // Generate a unique ID with timestamp and random component to avoid conflicts
-    const newNodeId = `prompt-node-${Date.now()}-${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+    // Generate a unique ID
+    const newNodeId = createNodeId('prompt-node');
 
     // Create a new prompt node with the current image as source
     // Use imageId if available, otherwise fall back to imageUrl
@@ -181,7 +232,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     addNodes(newNode);
 
     // Create an edge connecting the image node to the new prompt node
-    const edgeId = `edge-${id}-to-${newNodeId}`;
+    const edgeId = createEdgeId(id, newNodeId);
     addEdges({
       id: edgeId,
       source: id,
@@ -199,8 +250,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         maxZoom: 0.8,
       });
     }, 100);
-
-    setIsDoubleClicking(false);
   }, [
     id,
     currentImageUrl,
@@ -208,7 +257,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     addNodes,
     addEdges,
     getNode,
-    isDoubleClicking,
     findNonOverlappingPosition,
     fitView,
   ]);
@@ -226,10 +274,47 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   return (
     <div>
       <Handle type="target" position={Position.Top} id="input" />
+
+      {/* Node Toolbar */}
+      <NodeToolbar
+        isVisible={selected && !!currentImageUrl}
+        position={Position.Top}
+        offset={10}
+      >
+        <Menubar>
+          <MenubarMenu>
+            <MenubarTrigger
+              className="px-3 py-2 gap-2 text-xs"
+              onClick={handleDuplicate}
+            >
+              <Copy size={14} />
+              Duplicate
+            </MenubarTrigger>
+          </MenubarMenu>
+          <MenubarMenu>
+            <MenubarTrigger
+              className="px-3 py-2 gap-2 text-xs"
+              onClick={handleDownload}
+            >
+              <Download size={14} />
+              Download
+            </MenubarTrigger>
+          </MenubarMenu>
+          <MenubarMenu>
+            <MenubarTrigger
+              className="px-3 py-2 gap-2 text-xs"
+              onClick={handleEdit}
+            >
+              <Edit3 size={14} />
+              Edit
+            </MenubarTrigger>
+          </MenubarMenu>
+        </Menubar>
+      </NodeToolbar>
+
       <BaseNode
         selected={selected}
         className={`image-node p-0 w-[300px] ${statusClass}`}
-        onDoubleClick={handleDoubleClick}
       >
         <NodeHeader className="border-b">
           <NodeHeaderIcon>
@@ -259,7 +344,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </NodeHeaderActions>
         </NodeHeader>
 
-        <div className="image-node-content" onDoubleClick={handleDoubleClick}>
+        <div className="image-node-content">
           {nodeData.isLoading ? (
             <div className="p-5 text-center min-h-[150px] flex flex-col justify-center items-center">
               <div className="rounded-full bg-blue-500/20 w-10 h-10 mb-3 animate-spin border-2 border-blue-500 border-t-transparent"></div>

@@ -1,5 +1,6 @@
 import Dexie, { Table } from 'dexie';
 import { Node, Edge } from '@xyflow/react';
+import { createImageId } from '@/lib/utils';
 
 export interface PersistedNode extends Node {
   id: string;
@@ -25,6 +26,14 @@ export interface ApiKey {
   updatedAt: Date;
 }
 
+// New interface for user preferences
+export interface UserPreference {
+  id: string;
+  key: string;
+  value: any;
+  updatedAt: Date;
+}
+
 // New interface for optimized image storage
 export interface StoredImage {
   id: string;
@@ -44,16 +53,18 @@ export class FlowDatabase extends Dexie {
   edges!: Table<PersistedEdge>;
   apiKeys!: Table<ApiKey>;
   images!: Table<StoredImage>;
+  preferences!: Table<UserPreference>;
 
   constructor() {
     super('FlowDatabase');
-    // Increment version to 3 to add the images table
-    this.version(3).stores({
+    // Increment version to 4 to add the preferences table
+    this.version(4).stores({
       nodes: 'id, type, position, data, selectable',
       edges: 'id, source, target, sourceHandle, targetHandle',
       apiKeys: 'id, provider, key, createdAt, updatedAt',
       // Images table: only index metadata, NOT the imageData itself
-      images: 'id, mimeType, size, createdAt, width, height, source, *tags'
+      images: 'id, mimeType, size, createdAt, width, height, source, *tags',
+      preferences: 'id, key, value, updatedAt'
     });
   }
 }
@@ -82,6 +93,7 @@ export const persistenceService = {
   async clearAll() {
     await db.nodes.clear();
     await db.edges.clear();
+    await db.preferences.clear();
   }
 };
 
@@ -135,7 +147,7 @@ export const imageService = {
     source: 'generated' | 'uploaded' | 'edited' = 'generated',
     metadata?: { width?: number; height?: number; tags?: string[] }
   ): Promise<string> {
-    const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const imageId = createImageId();
 
     // Extract MIME type from data URL
     const mimeMatch = imageDataUrl.match(/^data:([^;]+);base64,/);
@@ -234,5 +246,32 @@ export const imageService = {
       count: images.length,
       totalSize
     };
+  }
+};
+
+// User preferences service
+export const preferencesService = {
+  async setPreference(key: string, value: any): Promise<void> {
+    const preference: UserPreference = {
+      id: key,
+      key,
+      value,
+      updatedAt: new Date()
+    };
+    await db.preferences.put(preference);
+  },
+
+  async getPreference(key: string, defaultValue: any = null): Promise<any> {
+    const preference = await db.preferences.get(key);
+    return preference ? preference.value : defaultValue;
+  },
+
+  async hasPreference(key: string): Promise<boolean> {
+    const preference = await db.preferences.get(key);
+    return preference !== undefined;
+  },
+
+  async deletePreference(key: string): Promise<void> {
+    await db.preferences.delete(key);
   }
 };

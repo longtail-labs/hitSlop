@@ -13,17 +13,16 @@ import {
   useReactFlow,
   ReactFlowProvider,
   SelectionMode,
-  OnSelectionChangeParams,
+  useOnSelectionChange,
   Node,
   Edge,
   NodeChange,
 } from '@xyflow/react';
-import { v4 as uuidv4 } from 'uuid';
-
 import {
   persistenceService,
   apiKeyService,
   imageService,
+  preferencesService,
   db,
 } from './services/database';
 
@@ -35,6 +34,8 @@ import { AppNode, ImageNodeData } from './nodes/types';
 import { ArrowDown, Settings, Trash } from 'lucide-react';
 import { DiscordIcon } from '@/components/ui/discord-icon';
 import { GitHubIcon } from '@/components/ui/github-icon';
+import { EXTERNAL_LINKS } from './config/links';
+import { createNodeId } from './lib/utils';
 
 // Import annotation node components
 import {
@@ -45,6 +46,8 @@ import {
 
 import { ApiKeyDialog } from '@/components/api-key-dialog';
 import { Button } from '@/components/ui/button';
+import { FloatingToolbar } from '@/components/floating-toolbar';
+import { TutorialBox } from '@/components/tutorial-box';
 
 // Add some custom styles for our prompt nodes
 import './styles.css';
@@ -69,9 +72,9 @@ function InstructionAnnotation() {
   return (
     <AnnotationNode>
       <AnnotationNodeContent>
-        Click anywhere on the canvas to create a new prompt node. Double-click
-        on an image to edit it, or select and drag multiple images to edit them
-        together.
+        Double-click anywhere on the canvas to create a new prompt node.
+        Double-click on an image to edit it, or select and drag multiple images
+        to edit them together.
       </AnnotationNodeContent>
       <AnnotationNodeIcon>
         <ArrowDown />
@@ -105,13 +108,31 @@ function Flow() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { screenToFlowPosition, getIntersectingNodes, fitView } =
     useReactFlow();
-  const [selectedImageNodes, setSelectedImageNodes] = useState<AppNode[]>([]);
-  const [previousSelectionCount, setPreviousSelectionCount] = useState(0);
-  const [isSelecting, setIsSelecting] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [, setIsDragOver] = useState(false);
   const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
   const [nodesToFocus, setNodesToFocus] = useState<string | null>(null);
+  const [currentSelectedImageNodes, setCurrentSelectedImageNodes] = useState<
+    AppNode[]
+  >([]);
+  const [showTutorialBox, setShowTutorialBox] = useState(false);
+
+  // Handle selection changes with the React Flow hook - just track the selection
+  const onSelectionChangeHandler = useCallback(
+    ({ nodes }: { nodes: Node[]; edges: Edge[] }) => {
+      // Filter for image nodes
+      const imageNodes = nodes.filter(
+        (node) => node.type === 'image-node',
+      ) as AppNode[];
+
+      setCurrentSelectedImageNodes(imageNodes);
+    },
+    [],
+  );
+
+  useOnSelectionChange({
+    onChange: onSelectionChangeHandler,
+  });
 
   // Request persistent storage to prevent data loss
   useEffect(() => {
@@ -170,7 +191,7 @@ function Flow() {
     loadPersistedData();
   }, [setNodes, setEdges]);
 
-  // Check for API keys on startup
+  // Check for API keys on startup and load tutorial preference
   useEffect(() => {
     const checkApiKeys = async () => {
       if (!isLoaded) return;
@@ -188,7 +209,24 @@ function Flow() {
       }
     };
 
+    const loadTutorialPreference = async () => {
+      if (!isLoaded) return;
+
+      try {
+        const tutorialDismissed = await preferencesService.getPreference(
+          'tutorial_dismissed',
+          false,
+        );
+        setShowTutorialBox(!tutorialDismissed);
+      } catch (error) {
+        console.error('Failed to load tutorial preference:', error);
+        // Default to showing tutorial if there's an error
+        setShowTutorialBox(true);
+      }
+    };
+
     checkApiKeys();
+    loadTutorialPreference();
   }, [isLoaded]);
 
   // Save nodes when they change
@@ -309,10 +347,10 @@ function Flow() {
     [nodesToFocus, fitView, onNodesChange],
   );
 
-  const onPaneClick = useCallback(
+  const onPaneDoubleClick = useCallback(
     (event: React.MouseEvent) => {
       if (reactFlowWrapper.current) {
-        // Get the position where the user clicked
+        // Get the position where the user double-clicked
         const reactFlowBounds =
           reactFlowWrapper.current.getBoundingClientRect();
         const position = screenToFlowPosition({
@@ -326,8 +364,8 @@ function Flow() {
           'prompt-node',
         );
 
-        // Generate a unique ID using UUID
-        const newNodeId = `prompt-node-${uuidv4()}`;
+        // Generate a unique ID using nanoid
+        const newNodeId = createNodeId('prompt-node');
 
         // Create a new node at the non-overlapping position
         const newNode: AppNode = {
@@ -350,85 +388,107 @@ function Flow() {
     [screenToFlowPosition, setNodes, findNonOverlappingPosition],
   );
 
-  const onSelectionChange = useCallback(
-    (params: OnSelectionChangeParams) => {
-      // Filter for image nodes
-      const imageNodes = params.nodes.filter(
-        (node) => node.type === 'image-node',
-      ) as AppNode[];
+  const createEditNodeFromSelection = useCallback(
+    (imageNodes: AppNode[]) => {
+      if (imageNodes.length === 0 || !reactFlowWrapper.current) return;
 
-      // Update the selected image nodes
-      setSelectedImageNodes(imageNodes);
+      // Calculate the average position of selected nodes to place the new node
+      const avgPosition = {
+        x:
+          imageNodes.reduce((sum, node) => sum + node.position.x, 0) /
+          imageNodes.length,
+        y:
+          imageNodes.reduce((sum, node) => sum + node.position.y, 0) /
+            imageNodes.length -
+          200, // Place it above
+      };
 
-      // Track that we're in the selection process
-      setIsSelecting(true);
+      // Find a non-overlapping position based on the average position
+      const nonOverlappingPosition = findNonOverlappingPosition(
+        avgPosition,
+        'prompt-node',
+      );
 
-      // Update the previous selection count
-      setPreviousSelectionCount(imageNodes.length);
+      // Collect image references from the selected nodes (prefer imageId over imageUrl)
+      const selectedImageReferences = imageNodes
+        .map((node) => {
+          const data = node.data as ImageNodeData;
+          return data?.imageId || data?.imageUrl; // Prefer imageId, fallback to imageUrl
+        })
+        .filter(Boolean) as string[];
+
+      if (selectedImageReferences.length === 0) return;
+
+      // Create a new edit node
+      const newNodeId = createNodeId('prompt-node');
+      const newNode: AppNode = {
+        id: newNodeId,
+        type: 'prompt-node',
+        position: nonOverlappingPosition,
+        data: {
+          prompt: '',
+          sourceImages: selectedImageReferences, // These can be image IDs or URLs
+        },
+        selectable: false,
+      };
+
+      // Add the new node to the flow
+      setNodes((nds) => [...nds, newNode]);
+
+      // Create edges connecting each selected image node to the new edit node
+      const newEdges = imageNodes.map((imageNode) => ({
+        id: `edge-${imageNode.id}-to-${newNodeId}`,
+        source: imageNode.id,
+        target: newNodeId,
+        sourceHandle: 'output',
+        targetHandle: 'input',
+      }));
+
+      setEdges((edges) => [...edges, ...newEdges]);
+
+      // Set the node to focus once it's initialized
+      setNodesToFocus(newNodeId);
     },
-    [previousSelectionCount],
+    [setNodes, setEdges, findNonOverlappingPosition],
   );
 
-  const createEditNodeFromSelection = useCallback(() => {
-    if (selectedImageNodes.length === 0 || !reactFlowWrapper.current) return;
+  // Listen for mouse up to create edit node when user finishes selecting
+  useEffect(() => {
+    // Don't run if the app hasn't loaded yet
+    if (!isLoaded) return;
 
-    // Calculate the average position of selected nodes to place the new node
-    const avgPosition = {
-      x:
-        selectedImageNodes.reduce((sum, node) => sum + node.position.x, 0) /
-        selectedImageNodes.length,
-      y:
-        selectedImageNodes.reduce((sum, node) => sum + node.position.y, 0) /
-          selectedImageNodes.length -
-        200, // Place it above
+    const handleMouseUp = () => {
+      // Only create edit node if we have multiple image nodes selected
+      if (currentSelectedImageNodes.length > 1) {
+        // Filter out any nodes that no longer exist (in case they were deleted)
+        const existingNodes = currentSelectedImageNodes.filter((selectedNode) =>
+          nodes.some((currentNode) => currentNode.id === selectedNode.id),
+        );
+
+        if (existingNodes.length > 1) {
+          createEditNodeFromSelection(existingNodes);
+          // Clear the selection after creating the edit node to prevent repeated triggers
+          setCurrentSelectedImageNodes([]);
+        } else {
+          // If we don't have enough existing nodes, clear the selection
+          setCurrentSelectedImageNodes([]);
+        }
+      }
     };
 
-    // Find a non-overlapping position based on the average position
-    const nonOverlappingPosition = findNonOverlappingPosition(
-      avgPosition,
-      'prompt-node',
-    );
+    // Add event listener to the document to catch mouse up anywhere
+    document.addEventListener('mouseup', handleMouseUp);
 
-    // Collect image references from the selected nodes (prefer imageId over imageUrl)
-    const selectedImageReferences = selectedImageNodes
-      .map((node) => {
-        const data = node.data as ImageNodeData;
-        return data?.imageId || data?.imageUrl; // Prefer imageId, fallback to imageUrl
-      })
-      .filter(Boolean) as string[];
-
-    if (selectedImageReferences.length === 0) return;
-
-    // Create a new edit node
-    const newNodeId = `prompt-node-${uuidv4()}`;
-    const newNode: AppNode = {
-      id: newNodeId,
-      type: 'prompt-node',
-      position: nonOverlappingPosition,
-      data: {
-        prompt: '',
-        sourceImages: selectedImageReferences, // These can be image IDs or URLs
-      },
-      selectable: false,
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
     };
-
-    // Add the new node to the flow
-    setNodes((nds) => [...nds, newNode]);
-
-    // Create edges connecting each selected image node to the new edit node
-    const newEdges = selectedImageNodes.map((imageNode) => ({
-      id: `edge-${imageNode.id}-to-${newNodeId}`,
-      source: imageNode.id,
-      target: newNodeId,
-      sourceHandle: 'output',
-      targetHandle: 'input',
-    }));
-
-    setEdges((edges) => [...edges, ...newEdges]);
-
-    // Set the node to focus once it's initialized
-    setNodesToFocus(newNodeId);
-  }, [selectedImageNodes, setNodes, setEdges, findNonOverlappingPosition]);
+  }, [
+    currentSelectedImageNodes,
+    createEditNodeFromSelection,
+    nodes,
+    setCurrentSelectedImageNodes,
+    isLoaded,
+  ]);
 
   // Handle drag and drop for local image files
   const handleDragOver = useCallback((event: React.DragEvent) => {
@@ -489,7 +549,7 @@ function Flow() {
               },
             );
 
-            const newNodeId = `image-node-${uuidv4()}`;
+            const newNodeId = createNodeId('image-node');
             const newNode: AppNode = {
               id: newNodeId,
               type: 'image-node',
@@ -506,7 +566,7 @@ function Flow() {
           } catch (error) {
             console.error('Error storing uploaded image:', error);
             // Fallback to legacy storage for backward compatibility
-            const newNodeId = `image-node-${uuidv4()}`;
+            const newNodeId = createNodeId('image-node');
             const newNode: AppNode = {
               id: newNodeId,
               type: 'image-node',
@@ -528,28 +588,27 @@ function Flow() {
     [screenToFlowPosition, findNonOverlappingPosition, setNodes],
   );
 
-  // Handle mouse up to detect when selection is finished
-  useEffect(() => {
-    const handleMouseUp = () => {
-      if (isSelecting && selectedImageNodes.length > 0) {
-        // We were selecting and now we're done, create the edit node
-        createEditNodeFromSelection();
-        setIsSelecting(false);
-      } else {
-        setIsSelecting(false);
-      }
-    };
+  // Handle tutorial box actions
+  const handleTutorialDismiss = useCallback(async () => {
+    try {
+      await preferencesService.setPreference('tutorial_dismissed', true);
+      setShowTutorialBox(false);
+    } catch (error) {
+      console.error('Failed to save tutorial preference:', error);
+      // Still hide it locally even if saving fails
+      setShowTutorialBox(false);
+    }
+  }, []);
 
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isSelecting, selectedImageNodes, createEditNodeFromSelection]);
+  const handleTutorialPlay = useCallback(() => {
+    // Open tutorial link - replace with your actual tutorial URL
+    window.open('https://your-tutorial-link.com', '_blank');
+  }, []);
 
   // Add clear all function
   const clearAllData = useCallback(async () => {
     const confirmed = window.confirm(
-      'Are you sure you want to clear all data? This will remove all nodes, edges, and images. API keys will be preserved. This action cannot be undone.',
+      'Are you sure you want to clear all data? This will remove all nodes, edges, images, and preferences (including tutorial state). API keys will be preserved. This action cannot be undone.',
     );
 
     if (confirmed) {
@@ -561,10 +620,13 @@ function Flow() {
         // Reset the flow to initial state
         setNodes([]);
         setEdges([]);
-        setSelectedImageNodes([]);
+        setCurrentSelectedImageNodes([]);
+
+        // Reset tutorial state since preferences were cleared
+        setShowTutorialBox(true);
 
         alert(
-          'All data has been cleared successfully. API keys have been preserved.',
+          'All data has been cleared successfully. API keys have been preserved. Tutorial will show again on next visit.',
         );
       } catch (error) {
         console.error('Error clearing data:', error);
@@ -590,8 +652,8 @@ function Flow() {
         edgeTypes={edgeTypes}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onPaneClick={onPaneClick}
-        onSelectionChange={onSelectionChange}
+        onDoubleClick={onPaneDoubleClick}
+        zoomOnDoubleClick={false}
         fitView
         minZoom={0.15}
         fitViewOptions={{
@@ -606,24 +668,34 @@ function Flow() {
         panOnDrag={false}
       >
         <Background />
-        <MiniMap pannable zoomable />
+        {!showTutorialBox && <MiniMap pannable zoomable />}
         <Controls>
           <ControlButton onClick={clearAllData} title="Clear all data">
             <Trash />
           </ControlButton>
         </Controls>
         <Panel position="top-left">
-          <div className="flex items-center gap-3 mb-2">
+          <div
+            className="flex items-center gap-3 mb-2"
+            style={{ maxWidth: '220px' }}
+          >
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
             <h1>hitSlop</h1>
           </div>
-          <h3>Image Gen Playground</h3>
-          <p>using OpenAI's new Image gen API, Gemini, and FLUX Kontext</p>
+          <h3 style={{ fontWeight: 'bold' }}>Image Gen Playground</h3>
+          <div style={{ fontSize: '0.9em', lineHeight: '1.4' }}>
+            <p>OpenAI Image Gen</p>
+            <p>Gemini</p>
+            <p>FLUX Knotext</p>
+            <p style={{ marginTop: '8px', fontStyle: 'italic' }}>
+              Join discord to suggest more
+            </p>
+          </div>
         </Panel>
         <Panel position="top-right">
           <div className="flex gap-2">
             <a
-              href="https://github.com/longtail-labs/hitslop"
+              href={EXTERNAL_LINKS.github}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -633,7 +705,7 @@ function Flow() {
               </Button>
             </a>
             <a
-              href="https://discord.gg/Sb7nWXbP"
+              href={EXTERNAL_LINKS.discord}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -655,6 +727,16 @@ function Flow() {
           </div>
         </Panel>
       </ReactFlow>
+      <FloatingToolbar
+        findNonOverlappingPosition={findNonOverlappingPosition}
+        setNodesToFocus={setNodesToFocus}
+      />
+      {showTutorialBox && (
+        <TutorialBox
+          onDismiss={handleTutorialDismiss}
+          onPlayClick={handleTutorialPlay}
+        />
+      )}
     </div>
   );
 }

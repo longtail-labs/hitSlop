@@ -10,9 +10,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { DiscordIcon } from '@/components/ui/discord-icon';
+import { EXTERNAL_LINKS } from '../config/links';
 
 interface ModelParameterControlsProps {
   modelId: ModelId;
@@ -154,6 +157,16 @@ export function ModelParameterControls({
                 </div>
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => window.open(EXTERNAL_LINKS.discord, '_blank')}
+              className="cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <DiscordIcon size={16} />
+                <span>Suggest a model</span>
+              </div>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
