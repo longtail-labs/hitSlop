@@ -24,35 +24,34 @@ import {
   imageService,
   preferencesService,
   db,
-} from '../services/database';
+} from './services/database';
 
 import '@xyflow/react/dist/style.css';
 
-import { initialNodes, nodeTypes } from '../nodes';
-import { initialEdges, edgeTypes } from '../edges';
-import { AppNode, ImageNodeData } from '../nodes/types';
+import { initialNodes, nodeTypes } from './nodes';
+import { initialEdges, edgeTypes } from './edges';
+import { AppNode, ImageNodeData } from './nodes/types';
 import { ArrowDown, Settings, Trash } from 'lucide-react';
-import { DiscordIcon } from './ui/discord-icon';
-import { GitHubIcon } from './ui/github-icon';
-import { EXTERNAL_LINKS } from '../config/links';
-import { createNodeId } from '../lib/utils';
+import { DiscordIcon } from './components/ui/discord-icon';
+import { GitHubIcon } from './components/ui/github-icon';
+import { EXTERNAL_LINKS } from './config/links';
+import { createNodeId } from './lib/utils';
 
 // Import annotation node components
 import {
   AnnotationNode,
   AnnotationNodeContent,
   AnnotationNodeIcon,
-} from './annotation-node';
+} from './components/annotation-node';
 
-import { ApiKeyDialog } from './api-key-dialog';
-import { Button } from './ui/button';
-import { FloatingToolbar } from './floating-toolbar';
-import { TutorialBox } from './tutorial-box';
+import { ApiKeyDialog } from './components/api-key-dialog';
+import { Button } from './components/ui/button';
+import { FloatingToolbar } from './components/floating-toolbar';
+import { TutorialBox } from './components/tutorial-box';
 
 // Add some custom styles for our prompt nodes
 // import '../styles/styles.css';
 // import "@xyflow/react/dist/style.css";
-
 
 // Add global styles for monospace font
 // const globalStyle = document.createElement('style');
@@ -678,14 +677,14 @@ function Flow() {
         </Controls>
         <Panel position="top-left">
           <div
-            className="flex items-center gap-3 mb-2"
+            className="flex items-center gap-3 mb-2 select-none"
             style={{ maxWidth: '220px' }}
           >
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
             <h1>hitSlop</h1>
           </div>
-          <h3 style={{ fontWeight: 'bold' }}>Image Gen Playground</h3>
-          <div style={{ fontSize: '0.9em', lineHeight: '1.4' }}>
+          <h3 style={{ fontWeight: 'bold' }} className="select-none">Image Gen Playground</h3>
+          <div style={{ fontSize: '0.9em', lineHeight: '1.4' }} className="select-none">
             <p>OpenAI Image Gen</p>
             <p>Gemini</p>
             <p>FLUX Knotext</p>

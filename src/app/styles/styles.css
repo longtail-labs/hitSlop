@@ -85,6 +85,11 @@
   height: 100vh;
 }
 
+/* Make text unselectable in specific areas */
+.react-flow__panel, .react-flow__controls {
+  user-select: none;
+}
+
 /* Header styles */
 h1 {
   font-size: 28px;
