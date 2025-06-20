@@ -25,7 +25,6 @@ export interface SerializableGenerationParams {
   // [key: string]: any; // Use with caution, prefer explicit properties
 }
 
-export type PositionLoggerNode = Node<{ label: string }, 'position-logger'>;
 export type PromptNodeData = {
   prompt?: string;
   model?: ModelId; // Updated to ModelId
@@ -68,4 +67,4 @@ export type ImageNodeData = {
 };
 export type ImageNode = Node<ImageNodeData, 'image-node'>;
 
-export type AppNode = BuiltInNode | PositionLoggerNode | PromptNode | ImageNode;
+export type AppNode = BuiltInNode | PromptNode | ImageNode;

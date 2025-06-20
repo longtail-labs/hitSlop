@@ -18,7 +18,7 @@ import { resetFalClient } from '@/app/services/providers/fal';
 
 interface ApiKeyDialogProps {
   open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  onOpenChange?: (_open: boolean) => void;
   trigger?: React.ReactNode;
 }
 

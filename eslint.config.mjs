@@ -31,6 +31,16 @@ export default defineConfig([
     },
   },
 
+  // Node.js environment for API routes
+  {
+    files: ['src/app/api/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...cleanGlobals(globals.node),
+      },
+    },
+  },
+
   // TypeScript files configuration
   {
     files: ['**/*.ts', '**/*.tsx'],

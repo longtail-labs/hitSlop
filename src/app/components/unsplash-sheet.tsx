@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { Search, Loader2, ExternalLink, Shuffle } from 'lucide-react';
@@ -7,7 +8,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet';
+} from '@/app/components/ui/sheet';
 import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
 import { createNodeId } from '@/app/lib/utils';
@@ -41,7 +42,7 @@ interface UnsplashPhoto {
 
 // Extended photo with onSelect handler
 interface EnhancedUnsplashPhoto extends UnsplashPhoto {
-  onSelect: (photo: UnsplashPhoto) => void;
+  onSelect: (_photo: UnsplashPhoto) => void;
 }
 
 interface UnsplashResponse {
@@ -52,7 +53,7 @@ interface UnsplashResponse {
 
 interface UnsplashSheetProps {
   isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (_open: boolean) => void;
   findNonOverlappingPosition: (
     _initialPosition: { x: number; y: number },
     _nodeType: string,

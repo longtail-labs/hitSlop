@@ -1,3 +1,4 @@
+import React from 'react';
 import './styles/index.css';
 import './styles/styles.css';
 import { Inter } from 'next/font/google';
