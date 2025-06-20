@@ -703,7 +703,7 @@ function Flow() {
           >
             <p>OpenAI Image Gen</p>
             <p>Gemini</p>
-            <p>FLUX Knotext</p>
+            <p>FLUX Kontext</p>
             <p style={{ marginTop: '8px', fontStyle: 'italic' }}>
               Join discord to suggest more
             </p>
