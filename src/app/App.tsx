@@ -690,13 +690,17 @@ function Flow() {
         <Panel position="top-left">
           <div
             className="flex items-center gap-3 mb-2"
-            style={{ maxWidth: '220px' }}
+            style={{ maxWidth: '220px', userSelect: 'none' }}
           >
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
-            <h1>hitSlop.com</h1>
+            <h1 style={{ userSelect: 'none' }}>hitSlop.com</h1>
           </div>
-          <h3 style={{ fontWeight: 'bold' }}>Generative Playground</h3>
-          <div style={{ fontSize: '0.9em', lineHeight: '1.4' }}>
+          <h3 style={{ fontWeight: 'bold', userSelect: 'none' }}>
+            Generative Playground
+          </h3>
+          <div
+            style={{ fontSize: '0.9em', lineHeight: '1.4', userSelect: 'none' }}
+          >
             <p>OpenAI Image Gen</p>
             <p>Gemini</p>
             <p>FLUX Knotext</p>
