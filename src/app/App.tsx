@@ -693,9 +693,9 @@ function Flow() {
             style={{ maxWidth: '220px' }}
           >
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
-            <h1>hitSlop</h1>
+            <h1>hitSlop.com</h1>
           </div>
-          <h3 style={{ fontWeight: 'bold' }}>Image Gen Playground</h3>
+          <h3 style={{ fontWeight: 'bold' }}>Generative Playground</h3>
           <div style={{ fontSize: '0.9em', lineHeight: '1.4' }}>
             <p>OpenAI Image Gen</p>
             <p>Gemini</p>
