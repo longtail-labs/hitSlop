@@ -82,7 +82,15 @@ async function resolveImageReferences(imageReferences?: string[]): Promise<strin
               }
 
               const arrayBuffer = await response.arrayBuffer();
-              const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+              // Convert ArrayBuffer to base64 without causing stack overflow
+              const uint8Array = new Uint8Array(arrayBuffer);
+              let binary = '';
+              const chunkSize = 0x8000; // 32KB chunks to avoid stack overflow
+              for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                const chunk = uint8Array.subarray(i, i + chunkSize);
+                binary += String.fromCharCode.apply(null, Array.from(chunk));
+              }
+              const base64 = btoa(binary);
               const mimeType = response.headers.get('content-type') || 'image/png';
               const dataUrl = `data:${mimeType};base64,${base64}`;
 
@@ -324,6 +332,7 @@ export const processImageOperation = async (
         position: position, // This position will be overridden by the caller's layout logic
         data: {
           imageId, // Use the stored image ID
+          source: isEditOperation ? ('edited' as const) : ('generated' as const),
           prompt: params.prompt,
           generationParams: serializableParams, // Use the explicitly constructed serializable params
           isEdited: isEditOperation,

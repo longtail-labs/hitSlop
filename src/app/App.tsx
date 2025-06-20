@@ -47,13 +47,13 @@ import {
 import { ApiKeyDialog } from './components/api-key-dialog';
 import { Button } from './components/ui/button';
 import { FloatingToolbar } from './components/floating-toolbar';
+import { FloatingSidebar } from './components/floating-sidebar';
 import { TutorialBox } from './components/tutorial-box';
 
-// Add some custom styles for our prompt nodes
-// import '../styles/styles.css';
-// import "@xyflow/react/dist/style.css";
+// // Add some custom styles for our prompt nodes
+// import './styles/styles.css';
 
-// Add global styles for monospace font
+// // Add global styles for monospace font
 // const globalStyle = document.createElement('style');
 // globalStyle.innerHTML = `
 //   .react-flow, .react-flow__node, .react-flow__controls, .react-flow__panel, button, input {
@@ -263,6 +263,7 @@ function Flow() {
   // Find a non-overlapping position for a new node
   const findNonOverlappingPosition = useCallback(
     (initialPosition: { x: number; y: number }, nodeType: string) => {
+      'use memo';
       const dimensions = NODE_DIMENSIONS[
         nodeType as keyof typeof NODE_DIMENSIONS
       ] || { width: 200, height: 200 };
@@ -310,13 +311,17 @@ function Flow() {
   );
 
   const onConnect: OnConnect = useCallback(
-    (connection) => setEdges((edges) => addEdge(connection, edges)),
+    (connection) => {
+      'use memo';
+      return setEdges((edges) => addEdge(connection, edges));
+    },
     [setEdges],
   );
 
   // Custom onNodesChange handler to detect when nodes are initialized
   const handleNodesChange = useCallback(
     (changes: NodeChange<AppNode>[]) => {
+      'use memo';
       // Apply the changes
       onNodesChange(changes);
 
@@ -350,6 +355,7 @@ function Flow() {
 
   const onPaneDoubleClick = useCallback(
     (event: React.MouseEvent) => {
+      'use memo';
       if (reactFlowWrapper.current) {
         // Get the position where the user double-clicked
         const reactFlowBounds =
@@ -391,6 +397,7 @@ function Flow() {
 
   const createEditNodeFromSelection = useCallback(
     (imageNodes: AppNode[]) => {
+      'use memo';
       if (imageNodes.length === 0 || !reactFlowWrapper.current) return;
 
       // Calculate the average position of selected nodes to place the new node
@@ -493,12 +500,14 @@ function Flow() {
 
   // Handle drag and drop for local image files
   const handleDragOver = useCallback((event: React.DragEvent) => {
+    'use memo';
     event.preventDefault();
     event.stopPropagation();
     setIsDragOver(true);
   }, []);
 
   const handleDragLeave = useCallback((event: React.DragEvent) => {
+    'use memo';
     event.preventDefault();
     event.stopPropagation();
     setIsDragOver(false);
@@ -506,6 +515,7 @@ function Flow() {
 
   const handleDrop = useCallback(
     (event: React.DragEvent) => {
+      'use memo';
       event.preventDefault();
       event.stopPropagation();
       setIsDragOver(false);
@@ -557,6 +567,7 @@ function Flow() {
               position,
               data: {
                 imageId, // Use the stored image ID
+                source: 'uploaded' as const,
                 isLoading: false,
                 prompt: `Uploaded: ${file.name}`,
               },
@@ -574,6 +585,7 @@ function Flow() {
               position,
               data: {
                 imageUrl: imageDataUrl, // Fallback to direct URL storage
+                source: 'uploaded' as const,
                 isLoading: false,
                 prompt: `Uploaded: ${file.name}`,
               },
@@ -677,14 +689,14 @@ function Flow() {
         </Controls>
         <Panel position="top-left">
           <div
-            className="flex items-center gap-3 mb-2 select-none"
+            className="flex items-center gap-3 mb-2"
             style={{ maxWidth: '220px' }}
           >
             <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
             <h1>hitSlop</h1>
           </div>
-          <h3 style={{ fontWeight: 'bold' }} className="select-none">Image Gen Playground</h3>
-          <div style={{ fontSize: '0.9em', lineHeight: '1.4' }} className="select-none">
+          <h3 style={{ fontWeight: 'bold' }}>Image Gen Playground</h3>
+          <div style={{ fontSize: '0.9em', lineHeight: '1.4' }}>
             <p>OpenAI Image Gen</p>
             <p>Gemini</p>
             <p>FLUX Knotext</p>
@@ -729,6 +741,10 @@ function Flow() {
         </Panel>
       </ReactFlow>
       <FloatingToolbar
+        findNonOverlappingPosition={findNonOverlappingPosition}
+        setNodesToFocus={setNodesToFocus}
+      />
+      <FloatingSidebar
         findNonOverlappingPosition={findNonOverlappingPosition}
         setNodesToFocus={setNodesToFocus}
       />

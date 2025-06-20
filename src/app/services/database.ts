@@ -44,7 +44,7 @@ export interface StoredImage {
   // Optional metadata that CAN be indexed
   width?: number;
   height?: number;
-  source?: 'generated' | 'uploaded' | 'edited';
+  source?: 'generated' | 'uploaded' | 'edited' | 'unsplash' | 'pexels';
   tags?: string[]; // For AI-analyzed tags if we add that feature later
 }
 
@@ -144,7 +144,7 @@ export const imageService = {
    */
   async storeImage(
     imageDataUrl: string,
-    source: 'generated' | 'uploaded' | 'edited' = 'generated',
+    source: 'generated' | 'uploaded' | 'edited' | 'unsplash' | 'pexels' = 'generated',
     metadata?: { width?: number; height?: number; tags?: string[] }
   ): Promise<string> {
     const imageId = createImageId();

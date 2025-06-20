@@ -56,7 +56,15 @@ export type ImageNodeData = {
   partialImageUrl?: string;
   streamingProgress?: string;
   modelConfig?: ModelConfig; // This is good, provides full context of the model used
-  // [key: string]: any; // Removed
+  source?: 'generated' | 'uploaded' | 'edited' | 'unsplash' | 'pexels'; // Image source type
+  // Legacy attribution for backward compatibility
+  attribution?: {
+    service: string;
+    serviceUrl: string;
+    creator: string;
+    creatorUrl: string;
+    photoUrl: string;
+  };
 };
 export type ImageNode = Node<ImageNodeData, 'image-node'>;
 

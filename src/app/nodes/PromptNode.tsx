@@ -100,6 +100,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
 
   const findNonOverlappingPosition = useCallback(
     (basePosition: { x: number; y: number }, index: number) => {
+      'use memo';
       const offset = index * 50; // Offset each image by 50px
       let position = {
         x: basePosition.x + offset,
@@ -147,6 +148,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
 
   const handlePromptChange = useCallback(
     (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
+      'use memo';
       const newPrompt = evt.target.value;
       setPrompt(newPrompt);
     },
@@ -161,6 +163,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   };
 
   const handleParameterChange = useCallback((paramName: string, value: any) => {
+    'use memo';
     setModelParams((prev) => ({
       ...prev,
       [paramName]: value,
@@ -205,6 +208,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   };
 
   const handleProcess = useCallback(async () => {
+    'use memo';
     if (!prompt.trim()) {
       setError('Please enter a prompt');
       return;
