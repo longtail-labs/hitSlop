@@ -36,6 +36,7 @@ import { DiscordIcon } from './components/ui/discord-icon';
 import { GitHubIcon } from './components/ui/github-icon';
 import { EXTERNAL_LINKS } from './config/links';
 import { createNodeId } from './lib/utils';
+import { useIsMobile } from './lib/hooks';
 
 // Import annotation node components
 import {
@@ -49,6 +50,7 @@ import { Button } from './components/ui/button';
 import { FloatingToolbar } from './components/floating-toolbar';
 import { FloatingSidebar } from './components/floating-sidebar';
 import { TutorialBox } from './components/tutorial-box';
+import { MobileView } from './components/mobile-view';
 
 // // Add some custom styles for our prompt nodes
 // import './styles/styles.css';
@@ -821,6 +823,19 @@ function Flow() {
 }
 
 export default function App() {
+  const isMobile = useIsMobile();
+
+  // Handle tutorial play action
+  const handleTutorialPlay = useCallback(() => {
+    // Open tutorial link - replace with your actual tutorial URL
+    window.open('https://your-tutorial-link.com', '_blank');
+  }, []);
+
+  // Render mobile view if on mobile device
+  if (isMobile) {
+    return <MobileView onPlayClick={handleTutorialPlay} />;
+  }
+
   return (
     <ReactFlowProvider>
       <Flow />
