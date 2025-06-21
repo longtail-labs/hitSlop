@@ -83,11 +83,27 @@ export const persistenceService = {
   },
 
   async loadNodes(): Promise<PersistedNode[]> {
-    return await db.nodes.toArray();
+    console.log('persistenceService: loading nodes from Dexie.');
+    try {
+      const nodes = await db.nodes.toArray();
+      console.log(`persistenceService: found ${nodes.length} nodes.`, nodes);
+      return nodes;
+    } catch (error) {
+      console.error('persistenceService: error loading nodes:', error);
+      return [];
+    }
   },
 
   async loadEdges(): Promise<PersistedEdge[]> {
-    return await db.edges.toArray();
+    console.log('persistenceService: loading edges from Dexie.');
+    try {
+      const edges = await db.edges.toArray();
+      console.log(`persistenceService: found ${edges.length} edges.`, edges);
+      return edges;
+    } catch (error) {
+      console.error('persistenceService: error loading edges:', error);
+      return [];
+    }
   },
 
   async clearAll() {

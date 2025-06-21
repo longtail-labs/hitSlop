@@ -167,27 +167,35 @@ function Flow() {
   // Load persisted data on mount
   useEffect(() => {
     const loadPersistedData = async () => {
+      console.log('Attempting to load persisted data...');
       try {
         const [persistedNodes, persistedEdges] = await Promise.all([
           persistenceService.loadNodes(),
           persistenceService.loadEdges(),
         ]);
 
+        console.log('Loaded persisted nodes from service:', persistedNodes);
+        console.log('Loaded persisted edges from service:', persistedEdges);
+
         if (persistedNodes.length > 0 || persistedEdges.length > 0) {
+          console.log('Found persisted data, setting state...');
           setNodes(persistedNodes as unknown as AppNode[]);
           setEdges(persistedEdges);
         } else {
           // Load default nodes if no persisted data
+          console.log('No persisted data found, loading default nodes.');
           setNodes(instructionalNodes as unknown as AppNode[]);
           setEdges(initialEdges);
         }
       } catch (error) {
-        console.error('Failed to load persisted data:', error);
+        console.error('Failed to load persisted data in App.tsx:', error);
         // Fallback to default nodes
+        console.log('Error loading data, falling back to default nodes.');
         setNodes(instructionalNodes as unknown as AppNode[]);
         setEdges(initialEdges);
       } finally {
         setIsLoaded(true);
+        console.log('Data loading process finished.');
       }
     };
 
