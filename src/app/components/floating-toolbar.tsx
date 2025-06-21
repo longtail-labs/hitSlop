@@ -66,7 +66,10 @@ export function FloatingToolbar({
             variant="ghost"
             size="sm"
             onClick={handleAddImageNode}
-            className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent"
+            className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent font-recursive"
+            style={{
+              fontVariationSettings: '"MONO" 0.6, "wght" 500, "CASL" 0.4',
+            }}
           >
             <Image size={18} />
             <span className="text-sm font-medium">Image</span>
@@ -78,7 +81,10 @@ export function FloatingToolbar({
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent cursor-default opacity-60"
+                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent cursor-default opacity-60 font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.6, "wght" 500, "CASL" 0.4',
+                }}
               >
                 <Video size={18} />
                 <span className="text-sm font-medium">Video</span>
@@ -86,8 +92,20 @@ export function FloatingToolbar({
             </PopoverTrigger>
             <PopoverContent className="w-48 p-3" side="top">
               <div className="text-center">
-                <div className="text-sm font-medium mb-1">Coming Soon</div>
-                <div className="text-xs text-muted-foreground">
+                <div
+                  className="text-sm font-medium mb-1 font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.5, "wght" 600, "CASL" 0.3',
+                  }}
+                >
+                  Coming Soon
+                </div>
+                <div
+                  className="text-xs text-muted-foreground font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.3, "wght" 400, "CASL" 0.7',
+                  }}
+                >
                   Video generation will be available in a future update
                 </div>
               </div>
@@ -100,7 +118,10 @@ export function FloatingToolbar({
               <Button
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent cursor-default opacity-60"
+                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent cursor-default opacity-60 font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.6, "wght" 500, "CASL" 0.4',
+                }}
               >
                 <AudioWaveform size={18} />
                 <span className="text-sm font-medium">Audio</span>
@@ -108,8 +129,20 @@ export function FloatingToolbar({
             </PopoverTrigger>
             <PopoverContent className="w-48 p-3" side="top">
               <div className="text-center">
-                <div className="text-sm font-medium mb-1">Coming Soon</div>
-                <div className="text-xs text-muted-foreground">
+                <div
+                  className="text-sm font-medium mb-1 font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.5, "wght" 600, "CASL" 0.3',
+                  }}
+                >
+                  Coming Soon
+                </div>
+                <div
+                  className="text-xs text-muted-foreground font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.3, "wght" 400, "CASL" 0.7',
+                  }}
+                >
                   Audio generation will be available in a future update
                 </div>
               </div>

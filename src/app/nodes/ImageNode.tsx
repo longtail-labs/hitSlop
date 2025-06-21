@@ -309,8 +309,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         <Menubar>
           <MenubarMenu>
             <MenubarTrigger
-              className="px-3 py-2 gap-2 text-xs"
+              className="px-3 py-2 gap-2 text-xs font-recursive"
               onClick={handleDuplicate}
+              style={{
+                fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
+              }}
             >
               <Copy size={14} />
               Duplicate
@@ -318,8 +321,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </MenubarMenu>
           <MenubarMenu>
             <MenubarTrigger
-              className="px-3 py-2 gap-2 text-xs"
+              className="px-3 py-2 gap-2 text-xs font-recursive"
               onClick={handleDownload}
+              style={{
+                fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
+              }}
             >
               <Download size={14} />
               Download
@@ -327,8 +333,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </MenubarMenu>
           <MenubarMenu>
             <MenubarTrigger
-              className="px-3 py-2 gap-2 text-xs"
+              className="px-3 py-2 gap-2 text-xs font-recursive"
               onClick={handleEdit}
+              style={{
+                fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
+              }}
             >
               <Edit3 size={14} />
               Edit
@@ -346,15 +355,22 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             <ImageIcon size={18} />
           </NodeHeaderIcon>
           <NodeHeaderTitle>
-            {imageSource === 'unsplash'
-              ? 'Unsplash Image'
-              : imageSource === 'pexels'
-              ? 'Pexels Image'
-              : imageSource === 'uploaded'
-              ? 'Local Image'
-              : imageSource === 'edited'
-              ? 'Edited Image'
-              : 'Generated Image'}
+            <span
+              className="font-recursive"
+              style={{
+                fontVariationSettings: '"MONO" 0.7, "wght" 600, "CASL" 0.3',
+              }}
+            >
+              {imageSource === 'unsplash'
+                ? 'Unsplash Image'
+                : imageSource === 'pexels'
+                ? 'Pexels Image'
+                : imageSource === 'uploaded'
+                ? 'Local Image'
+                : imageSource === 'edited'
+                ? 'Edited Image'
+                : 'Generated Image'}
+            </span>
           </NodeHeaderTitle>
           <NodeHeaderActions>
             {currentImageUrl && (
@@ -383,10 +399,20 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           {nodeData.isLoading ? (
             <div className="p-5 text-center min-h-[150px] flex flex-col justify-center items-center">
               <div className="rounded-full bg-blue-500/20 w-10 h-10 mb-3 animate-spin border-2 border-blue-500 border-t-transparent"></div>
-              <div className="text-sm text-muted-foreground">
+              <div
+                className="text-sm text-muted-foreground font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.5, "wght" 500, "CASL" 0.4',
+                }}
+              >
                 Generating image...
               </div>
-              <div className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis">
+              <div
+                className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.3, "wght" 400, "CASL" 0.6',
+                }}
+              >
                 {nodeData.prompt
                   ? `"${String(nodeData.prompt).substring(0, 50)}${
                       String(nodeData.prompt).length > 50 ? '...' : ''
@@ -404,18 +430,53 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               {nodeData.revisedPrompt &&
                 nodeData.revisedPrompt !== nodeData.prompt && (
                   <div className="p-2 text-xs text-muted-foreground bg-muted/50 border-t">
-                    <span className="font-medium">Revised prompt:</span>{' '}
-                    {nodeData.revisedPrompt}
+                    <span
+                      className="font-medium font-recursive"
+                      style={{
+                        fontVariationSettings:
+                          '"MONO" 0.6, "wght" 600, "CASL" 0.2',
+                      }}
+                    >
+                      Revised prompt:
+                    </span>{' '}
+                    <span
+                      className="font-recursive"
+                      style={{
+                        fontVariationSettings:
+                          '"MONO" 0.4, "wght" 400, "CASL" 0.5',
+                      }}
+                    >
+                      {nodeData.revisedPrompt}
+                    </span>
                   </div>
                 )}
             </div>
           ) : nodeData.error || imageLoadError ? (
             <div className="p-5 text-center bg-destructive/10 rounded-sm m-2 text-destructive min-h-[100px] flex flex-col justify-center">
-              <div className="font-medium mb-1">Generation Failed</div>
-              <div className="text-xs">{nodeData.error || imageLoadError}</div>
+              <div
+                className="font-medium mb-1 font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.7, "wght" 600, "CASL" 0.2',
+                }}
+              >
+                Generation Failed
+              </div>
+              <div
+                className="text-xs font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.4, "wght" 400, "CASL" 0.4',
+                }}
+              >
+                {nodeData.error || imageLoadError}
+              </div>
             </div>
           ) : (
-            <div className="p-5 text-center bg-muted rounded m-2 text-muted-foreground">
+            <div
+              className="p-5 text-center bg-muted rounded m-2 text-muted-foreground font-recursive"
+              style={{
+                fontVariationSettings: '"MONO" 0.5, "wght" 400, "CASL" 0.5',
+              }}
+            >
               Image failed to load
             </div>
           )}
@@ -428,7 +489,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-[90vw] max-h-[90vh] p-0">
             <DialogHeader className="p-4 flex-row items-center justify-between border-b">
-              <DialogTitle>Image Preview</DialogTitle>
+              <DialogTitle
+                className="font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.6, "wght" 600, "CASL" 0.3',
+                }}
+              >
+                Image Preview
+              </DialogTitle>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleDownload}

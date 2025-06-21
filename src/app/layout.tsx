@@ -1,37 +1,49 @@
 import React from 'react';
 import './styles/index.css';
 import './styles/styles.css';
-import { Inter } from 'next/font/google';
 import type { Metadata } from 'next';
 
-const inter = Inter({ subsets: ['latin'] });
+// Import Recursive font from Google Fonts
+import { Recursive } from 'next/font/google';
+
+const recursive = Recursive({
+  subsets: ['latin'],
+  axes: ['MONO', 'CASL', 'slnt', 'CRSV'],
+  variable: '--font-recursive',
+});
 
 export const metadata: Metadata = {
-  title: 'hitSlop.com - Generative Playground',
+  title: 'hitSlop.com - Vibe Playground',
   description:
-    'hitSlop is a generative playground for visual AI models. A node-based editor to chain models together and create unique generative pipelines. Experiment, collaborate, and share your creations.',
+    'hitSlop is a creative vibe playground where ideas come to life through AI. Effortlessly create, morph, and imagine visual concepts through an intuitive flow-based canvas. Currently focused on image generation, with more creative tools coming soon.',
   applicationName: 'hitSlop',
   keywords: [
-    'Generative AI',
-    'Playground',
-    'AI Models',
+    'AI Creativity',
+    'Visual Playground',
+    'Creative Flow',
+    'AI Dreams',
     'Image Generation',
-    'Machine Learning',
-    'Node-based editor',
-    'AI workflow',
+    'Creative Canvas',
+    'Visual Imagination',
+    'AI Art Studio',
+    'Creative Workflows',
+    'Generative Creativity',
+    'Visual AI Playground',
+    'Creative Expression',
   ],
   authors: [{ name: 'hitSlop', url: 'https://hitslop.com' }],
   creator: 'hitSlop',
   publisher: 'hitSlop',
   metadataBase: new URL('https://hitslop.com'),
   openGraph: {
-    title: 'hitSlop - Generative Playground',
-    description: 'A node-based generative playground for visual AI models.',
+    title: 'hitSlop - Creative AI Playground',
+    description:
+      'Bring your ideas to life through AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
     url: 'https://hitslop.com',
     siteName: 'hitSlop',
     images: [
       {
-        url: '/hitslop.png',
+        url: '/logo.png',
         width: 1200,
         height: 630,
         alt: 'The hitSlop logo',
@@ -42,9 +54,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'hitSlop - Generative Playground',
-    description: 'A node-based generative playground for visual AI models.',
-    images: ['/hitslop.png'],
+    title: 'hitSlop - Creative AI Playground',
+    description:
+      'Bring your ideas to life through AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
+    images: ['/logo.png'],
   },
   icons: {
     icon: '/favicon.ico',
@@ -60,8 +73,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={recursive.variable}>
+      <body className="font-recursive">
         <main className="min-h-screen">{children}</main>
       </body>
     </html>

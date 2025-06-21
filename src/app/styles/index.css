@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-    font-family: "JetBrains Mono", "Fira Code", "Courier New", monospace;
+    font-family: var(--font-recursive), "JetBrains Mono", "Fira Code", "Courier New", monospace;
     line-height: 1.5;
     font-weight: 400;
     --radius: 0.625rem;

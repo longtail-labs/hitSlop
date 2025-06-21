@@ -692,19 +692,56 @@ function Flow() {
             className="flex items-center gap-3 mb-2"
             style={{ maxWidth: '220px', userSelect: 'none' }}
           >
-            <img src="/hitslop.png" alt="hitSlop logo" className="w-8" />
-            <h1 style={{ userSelect: 'none' }}>hitSlop.com</h1>
+            <img
+              src="/logo.png"
+              alt="hitSlop logo"
+              className="w-8 border border-gray-300 rounded shadow-md"
+            />
+            <h1
+              className="font-recursive"
+              style={{
+                userSelect: 'none',
+                fontVariationSettings: '"MONO" 1, "wght" 700, "CASL" 0',
+                fontSize: '24px',
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              hitSlop.com
+            </h1>
           </div>
-          <h3 style={{ fontWeight: 'bold', userSelect: 'none' }}>
-            Generative Playground
+          <h3
+            className="font-recursive"
+            style={{
+              fontWeight: 'bold',
+              userSelect: 'none',
+              fontVariationSettings:
+                '"MONO" 0.3, "wght" 600, "CASL" 0.8, "CRSV" 0.5',
+              fontSize: '16px',
+            }}
+          >
+            Vibe Playground
           </h3>
           <div
-            style={{ fontSize: '0.9em', lineHeight: '1.4', userSelect: 'none' }}
+            className="font-recursive"
+            style={{
+              fontSize: '0.9em',
+              lineHeight: '1.4',
+              userSelect: 'none',
+              fontVariationSettings: '"MONO" 0.5, "wght" 400, "CASL" 0.6',
+            }}
           >
             <p>OpenAI Image Gen</p>
             <p>Gemini</p>
             <p>FLUX Kontext</p>
-            <p style={{ marginTop: '8px', fontStyle: 'italic' }}>
+            <p
+              style={{
+                marginTop: '8px',
+                fontStyle: 'italic',
+                fontVariationSettings:
+                  '"MONO" 0.2, "wght" 400, "CASL" 1, "CRSV" 1',
+              }}
+            >
               Join discord to suggest more
             </p>
           </div>
@@ -716,7 +753,14 @@ function Flow() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
+                }}
+              >
                 <GitHubIcon className="h-4 w-4" />
                 GitHub
               </Button>
@@ -726,7 +770,14 @@ function Flow() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
+                }}
+              >
                 <DiscordIcon className="h-4 w-4" />
                 Discord
               </Button>
@@ -735,7 +786,14 @@ function Flow() {
               open={isApiKeyDialogOpen}
               onOpenChange={setIsApiKeyDialogOpen}
               trigger={
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
+                  }}
+                >
                   <Settings className="h-4 w-4" />
                   Keys
                 </Button>
