@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Handle,
-  Position,
-  type NodeProps,
-  useReactFlow,
-  NodeToolbar,
-} from '@xyflow/react';
+import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react';
 import { useState, useCallback, useEffect } from 'react';
 import { BaseNode } from '@/app/components/base-node';
 import {
@@ -15,110 +9,75 @@ import {
   NodeHeaderActions,
   NodeHeaderDeleteAction,
 } from '@/app/components/node-header';
-import { ImageIcon, Download, Maximize, Copy, Edit3 } from 'lucide-react';
+import { ImageIcon, Download, Maximize } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/app/components/ui/dialog';
-import {
-  Menubar,
-  MenubarMenu,
-  MenubarTrigger,
-} from '@/app/components/ui/menubar';
 import { imageService } from '@/app/services/database';
-import { createNodeId, createEdgeId } from '@/app/lib/utils';
+import { createNodeId, createEdgeId, createImageNode } from '@/app/lib/utils';
+import { ImageNodeToolbar } from '@/app/components/image-node-toolbar';
 
 // Import the ImageNodeData type from types
 import { ImageNodeData } from './types';
 
 export function ImageNode({ data, selected, id }: NodeProps) {
-  // Cast data to expected type
-  const nodeData = data as ImageNodeData;
-  const reactFlowInstance = useReactFlow();
-  const { addNodes, addEdges, getNode, getIntersectingNodes, fitView } =
-    reactFlowInstance;
+  const nodeData = data as unknown as ImageNodeData;
+  const {
+    addNodes,
+    addEdges,
+    getNode,
+    getIntersectingNodes,
+    fitView,
+    setNodes,
+  } = useReactFlow();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [imageLoadError, setImageLoadError] = useState<string | null>(null);
-  const [imageSource, setImageSource] = useState<string>('generated');
 
-  // Load image data when component mounts or imageId changes
+  // Simplified image loading
   useEffect(() => {
     const loadImage = async () => {
-      // If we have an imageId, load from optimized storage
       if (nodeData.imageId) {
         try {
-          const [imageUrl, metadata] = await Promise.all([
-            imageService.getImage(nodeData.imageId),
-            imageService.getImageMetadata(nodeData.imageId),
-          ]);
-
+          const imageUrl = await imageService.getImage(nodeData.imageId);
           if (imageUrl) {
             setCurrentImageUrl(imageUrl);
             setImageLoadError(null);
-            // Set source from metadata, fallback to node data, then to default
-            setImageSource(metadata?.source || nodeData.source || 'generated');
           } else {
-            setImageLoadError('Image not found in storage');
-            // Fallback to legacy imageUrl if available
-            if (nodeData.imageUrl) {
-              setCurrentImageUrl(nodeData.imageUrl);
-              setImageLoadError(null);
-              setImageSource(nodeData.source || 'generated');
-            }
+            setImageLoadError('Image not found in database');
           }
         } catch (error) {
           console.error('Error loading image:', error);
           setImageLoadError('Failed to load image');
-          // Fallback to legacy imageUrl if available
-          if (nodeData.imageUrl) {
-            setCurrentImageUrl(nodeData.imageUrl);
-            setImageLoadError(null);
-            setImageSource(nodeData.source || 'generated');
-          }
-        }
-      }
-      // Fallback to legacy imageUrl for backward compatibility
-      else if (nodeData.imageUrl) {
-        setCurrentImageUrl(nodeData.imageUrl);
-        setImageLoadError(null);
-        // For legacy nodes, try to determine source from attribution or node data
-        if (nodeData.attribution?.service === 'Unsplash') {
-          setImageSource('unsplash');
-        } else if (nodeData.prompt && nodeData.prompt.startsWith('Uploaded:')) {
-          setImageSource('uploaded');
-        } else {
-          setImageSource(nodeData.source || 'generated');
         }
       } else {
         setCurrentImageUrl(null);
-        setImageSource(nodeData.source || 'generated');
+        setImageLoadError('No image ID provided to node');
       }
     };
 
     loadImage();
-  }, [
-    nodeData.imageId,
-    nodeData.imageUrl,
-    nodeData.source,
-    nodeData.attribution,
-  ]);
+  }, [nodeData.imageId]);
 
-  const handleDownload = () => {
+  const handleDelete = useCallback(() => {
+    setNodes((nodes) => nodes.filter((node) => node.id !== id));
+  }, [id, setNodes]);
+
+  const handleDownload = useCallback(() => {
     if (currentImageUrl) {
-      // Create a temporary anchor element
       const link = document.createElement('a');
       link.href = currentImageUrl;
-      link.download = `ai-generated-image-${Date.now()}.png`;
+      link.download = `image-${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
-  };
+  }, [currentImageUrl]);
 
-  // Find a non-overlapping position for a new node
   const findNonOverlappingPosition = useCallback(
     (
       initialPosition: { x: number; y: number },
@@ -131,28 +90,21 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         width: dimensions.width,
         height: dimensions.height,
       };
-
-      // Check if the position causes overlap
       let intersections = getIntersectingNodes(tempNode);
 
-      // If there are intersections, try to find a better position
       if (intersections.length > 0) {
-        // Try different positions in a spiral pattern
         const spiralStep = 100;
         let attempts = 0;
         let angle = 0;
         let radius = spiralStep;
 
         while (intersections.length > 0 && attempts < 50) {
-          // Move in a spiral pattern
           angle += 0.5;
           radius = spiralStep * (1 + angle / 10);
-
           position = {
             x: initialPosition.x + radius * Math.cos(angle),
             y: initialPosition.y + radius * Math.sin(angle),
           };
-
           tempNode = { ...tempNode, position };
           intersections = getIntersectingNodes(tempNode);
           attempts++;
@@ -165,80 +117,71 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   );
 
   const handleDuplicate = useCallback(() => {
-    if (!currentImageUrl) return;
+    if (!nodeData.imageId) return;
 
-    // Get the current node position
     const currentNode = getNode(id);
     if (!currentNode) return;
 
-    // Create base position for new node (to the right of the current node)
-    const initialPosition = {
-      x: currentNode.position.x + 350, // Place it to the right with spacing
+    const newPosition = findNonOverlappingPosition({
+      x: currentNode.position.x + 350,
       y: currentNode.position.y,
+    });
+
+    const options: any = {
+      source: nodeData.source,
     };
 
-    // Find a non-overlapping position
-    const newPosition = findNonOverlappingPosition(initialPosition);
+    if ('prompt' in nodeData && nodeData.prompt) {
+      options.prompt = nodeData.prompt;
+    }
 
-    // Generate a unique ID
-    const newNodeId = createNodeId('image-node');
+    if (nodeData.source === 'unsplash') {
+      options.photographer = nodeData.photographer;
+      options.photographer_url = nodeData.photographer_url;
+      options.alt = nodeData.alt;
+      options.attribution = nodeData.attribution;
+    } else if (
+      nodeData.source === 'generated' ||
+      nodeData.source === 'edited'
+    ) {
+      options.generationParams = nodeData.generationParams;
+      options.modelConfig = nodeData.modelConfig;
+      options.revisedPrompt = nodeData.revisedPrompt;
+      options.isEdited = nodeData.isEdited;
+    }
 
-    // Create a new image node with the same data
-    const newNode = {
-      id: newNodeId,
-      type: 'image-node',
+    const newNode = createImageNode(nodeData.imageId, {
       position: newPosition,
-      data: {
-        ...nodeData, // Copy all existing data
-      },
-    };
+      ...options,
+    });
 
-    // Add the new node to the flow
-    addNodes(newNode);
+    addNodes(newNode as any); // Use `any` to satisfy React Flow's broad type
 
-    // Focus on the newly created node
     setTimeout(() => {
       fitView({
-        nodes: [{ id: newNodeId }],
+        nodes: [{ id: newNode.id }],
         duration: 500,
         padding: 1.8,
         maxZoom: 0.8,
       });
     }, 100);
-  }, [
-    id,
-    currentImageUrl,
-    nodeData,
-    addNodes,
-    getNode,
-    findNonOverlappingPosition,
-    fitView,
-  ]);
+  }, [id, nodeData, addNodes, getNode, findNonOverlappingPosition, fitView]);
 
   const handleEdit = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation();
-      if (!currentImageUrl) return;
+      if (!nodeData.imageId) return;
 
-      // Get the current node position
       const currentNode = getNode(id);
       if (!currentNode) return;
 
-      // Create base position for new node (below the current node)
       const initialPosition = {
         x: currentNode.position.x,
-        y: currentNode.position.y + 350, // Place it below with spacing
+        y: currentNode.position.y + 350,
       };
 
-      // Find a non-overlapping position
       const newPosition = findNonOverlappingPosition(initialPosition);
-
-      // Generate a unique ID
       const newNodeId = createNodeId('prompt-node');
-
-      // Create a new prompt node with the current image as source
-      // Use imageId if available, otherwise fall back to imageUrl
-      const sourceImageReference = nodeData.imageId || currentImageUrl;
 
       const newNode = {
         id: newNodeId,
@@ -246,15 +189,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         position: newPosition,
         data: {
           prompt: '',
-          sourceImages: [sourceImageReference],
+          sourceImages: [nodeData.imageId], // Always use imageId
         },
         selectable: false,
       };
 
-      // Add the new node to the flow
       addNodes(newNode);
 
-      // Create an edge connecting the image node to the new prompt node
       const edgeId = createEdgeId(id, newNodeId);
       addEdges({
         id: edgeId,
@@ -264,7 +205,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         targetHandle: 'input',
       });
 
-      // Focus on the newly created node
       setTimeout(() => {
         fitView({
           nodes: [{ id: newNodeId }],
@@ -276,7 +216,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     },
     [
       id,
-      currentImageUrl,
       nodeData.imageId,
       addNodes,
       addEdges,
@@ -286,69 +225,43 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     ],
   );
 
-  // Determine status class
-  let statusClass = '';
-  if (nodeData.isLoading) {
-    statusClass = 'animate-pulse border-2 border-blue-400';
-  } else if (nodeData.error || imageLoadError) {
-    statusClass = 'border-2 border-destructive';
-  } else if (currentImageUrl) {
-    statusClass = 'border-2 border-green-500';
-  }
+  // Determine display title based on source
+  const getImageTitle = () => {
+    switch (nodeData.source) {
+      case 'unsplash':
+        return 'Unsplash Image';
+      case 'uploaded':
+        return 'Local Image';
+      case 'edited':
+        return 'Edited Image';
+      default:
+        return 'Generated Image';
+    }
+  };
+
+  // Determine status styling
+  const getStatusClass = () => {
+    if (nodeData.isLoading) return 'animate-pulse border-2 border-blue-400';
+    if (nodeData.error || imageLoadError) return 'border-2 border-destructive';
+    if (currentImageUrl) return 'border-2 border-green-500';
+    return '';
+  };
 
   return (
     <div>
       <Handle type="target" position={Position.Top} id="input" />
 
-      {/* Node Toolbar */}
-      <NodeToolbar
+      <ImageNodeToolbar
         isVisible={selected && !!currentImageUrl}
-        position={Position.Top}
-        offset={10}
-      >
-        <Menubar>
-          <MenubarMenu>
-            <MenubarTrigger
-              className="px-3 py-2 gap-2 text-xs font-recursive"
-              onClick={handleDuplicate}
-              style={{
-                fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
-              }}
-            >
-              <Copy size={14} />
-              Duplicate
-            </MenubarTrigger>
-          </MenubarMenu>
-          <MenubarMenu>
-            <MenubarTrigger
-              className="px-3 py-2 gap-2 text-xs font-recursive"
-              onClick={handleDownload}
-              style={{
-                fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
-              }}
-            >
-              <Download size={14} />
-              Download
-            </MenubarTrigger>
-          </MenubarMenu>
-          <MenubarMenu>
-            <MenubarTrigger
-              className="px-3 py-2 gap-2 text-xs font-recursive"
-              onClick={handleEdit}
-              style={{
-                fontVariationSettings: '"MONO" 0.8, "wght" 500, "CASL" 0.2',
-              }}
-            >
-              <Edit3 size={14} />
-              Edit
-            </MenubarTrigger>
-          </MenubarMenu>
-        </Menubar>
-      </NodeToolbar>
+        onDuplicate={handleDuplicate}
+        onDownload={handleDownload}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
 
       <BaseNode
         selected={selected}
-        className={`image-node p-0 w-[300px] ${statusClass}`}
+        className={`image-node p-0 w-[300px] ${getStatusClass()}`}
       >
         <NodeHeader className="border-b">
           <NodeHeaderIcon>
@@ -361,15 +274,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 fontVariationSettings: '"MONO" 0.7, "wght" 600, "CASL" 0.3',
               }}
             >
-              {imageSource === 'unsplash'
-                ? 'Unsplash Image'
-                : imageSource === 'pexels'
-                ? 'Pexels Image'
-                : imageSource === 'uploaded'
-                ? 'Local Image'
-                : imageSource === 'edited'
-                ? 'Edited Image'
-                : 'Generated Image'}
+              {getImageTitle()}
             </span>
           </NodeHeaderTitle>
           <NodeHeaderActions>
@@ -407,27 +312,28 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               >
                 Generating image...
               </div>
-              <div
-                className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis font-recursive"
-                style={{
-                  fontVariationSettings: '"MONO" 0.3, "wght" 400, "CASL" 0.6',
-                }}
-              >
-                {nodeData.prompt
-                  ? `"${String(nodeData.prompt).substring(0, 50)}${
-                      String(nodeData.prompt).length > 50 ? '...' : ''
-                    }"`
-                  : ''}
-              </div>
+              {nodeData.prompt && (
+                <div
+                  className="text-xs mt-1.5 text-muted-foreground max-w-[250px] overflow-hidden text-ellipsis font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.3, "wght" 400, "CASL" 0.6',
+                  }}
+                >
+                  "{String(nodeData.prompt).substring(0, 50)}
+                  {String(nodeData.prompt).length > 50 ? '...' : ''}"
+                </div>
+              )}
             </div>
           ) : currentImageUrl ? (
             <div onDoubleClick={handleEdit} className="cursor-pointer">
               <img
                 src={currentImageUrl}
-                alt="Generated AI image"
+                alt="AI generated image"
                 className="max-w-full rounded"
               />
-              {nodeData.revisedPrompt &&
+              {(nodeData.source === 'generated' ||
+                nodeData.source === 'edited') &&
+                nodeData.revisedPrompt &&
                 nodeData.revisedPrompt !== nodeData.prompt && (
                   <div className="p-2 text-xs text-muted-foreground bg-muted/50 border-t">
                     <span
@@ -477,11 +383,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 fontVariationSettings: '"MONO" 0.5, "wght" 400, "CASL" 0.5',
               }}
             >
-              Image failed to load
+              No image data
             </div>
           )}
         </div>
       </BaseNode>
+
       <Handle type="source" position={Position.Bottom} id="output" />
 
       {/* Fullscreen Image Dialog */}
@@ -510,7 +417,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             <div className="overflow-hidden p-4 flex items-center justify-center h-[calc(90vh-120px)]">
               <img
                 src={currentImageUrl}
-                alt="Generated AI image (full size)"
+                alt="AI generated image (full size)"
                 className="object-contain w-auto h-auto max-w-[calc(90vw-32px)] max-h-[calc(90vh-140px)]"
               />
             </div>

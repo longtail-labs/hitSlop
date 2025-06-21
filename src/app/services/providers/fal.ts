@@ -33,8 +33,8 @@ export function resetFalClient() {
 export interface FalGenerationParams {
   prompt: string;
   model: string;
-  image_url?: string; // For single image-to-image operations
-  image_urls?: string[]; // For multi-image operations
+  image_url?: string;
+  image_urls?: string[];
   guidance_scale?: number;
   num_images?: number;
   safety_tolerance?: number;
@@ -56,19 +56,18 @@ export async function generateWithFal(params: FalGenerationParams): Promise<Oper
       };
     }
 
-    // For fal-ai/flux-pro/kontext (single image editing), we need an image_url
+    // Validate required images for specific models
     if (params.model === 'fal-ai/flux-pro/kontext' && !params.image_url) {
       return {
         success: false,
-        error: 'FLUX Kontext (Edit) requires a source image for editing. Please upload an image first.'
+        error: 'FLUX Kontext (Edit) requires a source image for editing.'
       };
     }
 
-    // For fal-ai/flux-pro/kontext/max/multi (multi-image editing), we need image_urls
     if (params.model === 'fal-ai/flux-pro/kontext/max/multi' && (!params.image_urls || params.image_urls.length === 0)) {
       return {
         success: false,
-        error: 'FLUX Kontext Multi requires multiple source images for editing. Please upload images first.'
+        error: 'FLUX Kontext Multi requires multiple source images for editing.'
       };
     }
 
@@ -76,30 +75,16 @@ export async function generateWithFal(params: FalGenerationParams): Promise<Oper
     const requestPayload: any = {
       prompt: params.prompt,
       num_images: params.num_images || 1,
-      safety_tolerance: "5", // Default to most permissive
-      output_format: "png", // Always use PNG
+      safety_tolerance: "5",
+      output_format: "png",
     };
 
-    // Add model-specific parameters
-    if (params.image_url) {
-      requestPayload.image_url = params.image_url;
-    }
-
-    if (params.image_urls && params.image_urls.length > 0) {
-      requestPayload.image_urls = params.image_urls;
-    }
-
-    if (params.guidance_scale !== undefined) {
-      requestPayload.guidance_scale = params.guidance_scale;
-    }
-
-    if (params.aspect_ratio) {
-      requestPayload.aspect_ratio = params.aspect_ratio;
-    }
-
-    if (params.seed !== undefined) {
-      requestPayload.seed = params.seed;
-    }
+    // Add optional parameters
+    if (params.image_url) requestPayload.image_url = params.image_url;
+    if (params.image_urls && params.image_urls.length > 0) requestPayload.image_urls = params.image_urls;
+    if (params.guidance_scale !== undefined) requestPayload.guidance_scale = params.guidance_scale;
+    if (params.aspect_ratio) requestPayload.aspect_ratio = params.aspect_ratio;
+    if (params.seed !== undefined) requestPayload.seed = params.seed;
 
     console.log('Generating with FAL:', {
       model: params.model,
@@ -113,7 +98,7 @@ export async function generateWithFal(params: FalGenerationParams): Promise<Oper
     const result = await falClient.subscribe(params.model, {
       input: {
         ...requestPayload,
-        sync_mode: true, // Force synchronous mode to get base64 responses
+        sync_mode: true,
       },
       logs: true,
       onQueueUpdate: (update: any) => {
@@ -132,7 +117,7 @@ export async function generateWithFal(params: FalGenerationParams): Promise<Oper
       };
     }
 
-    // Extract image URLs from FAL response and validate they are base64 data URLs
+    // Process image URLs - FAL should return base64 data URLs with sync_mode
     const imageUrls: string[] = [];
 
     for (const img of result.data.images) {
@@ -141,18 +126,13 @@ export async function generateWithFal(params: FalGenerationParams): Promise<Oper
         continue;
       }
 
-      // Check if it's a base64 data URL
       if (img.url.startsWith('data:')) {
         imageUrls.push(img.url);
-        console.log(`FAL returned base64 data URL: ${img.url.substring(0, 50)}...`);
       } else {
-        // If it's a regular URL, we need to convert it to base64
-        console.log(`FAL returned regular URL, converting to base64: ${img.url}`);
+        // If FAL returns a URL despite sync_mode, convert to base64
         try {
           const response = await fetch(img.url);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch image from URL: ${response.statusText}`);
-          }
+          if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
 
           const arrayBuffer = await response.arrayBuffer();
           const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
@@ -160,11 +140,12 @@ export async function generateWithFal(params: FalGenerationParams): Promise<Oper
           const dataUrl = `data:${mimeType};base64,${base64}`;
 
           imageUrls.push(dataUrl);
-          console.log(`Successfully converted URL to base64: ${dataUrl.substring(0, 50)}...`);
         } catch (error) {
           console.error(`Failed to convert FAL URL to base64:`, error);
-          // As a fallback, still include the URL but warn about it
-          imageUrls.push(img.url);
+          return {
+            success: false,
+            error: 'Failed to process generated images'
+          };
         }
       }
     }
@@ -188,8 +169,6 @@ export async function generateWithFal(params: FalGenerationParams): Promise<Oper
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
-    } else if (typeof error === 'object' && error !== null && 'message' in error) {
-      errorMessage = String(error.message);
     }
 
     // Handle common FAL API errors

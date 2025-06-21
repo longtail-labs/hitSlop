@@ -11,7 +11,7 @@ import {
 } from '@/app/components/ui/sheet';
 import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
-import { createNodeId } from '@/app/lib/utils';
+import { createImageNode } from '@/app/lib/utils';
 import { imageService } from '@/app/services/database';
 
 interface UnsplashPhoto {
@@ -286,37 +286,27 @@ export function UnsplashSheet({
         'image-node',
       );
 
-      // Generate a unique ID
-      const newNodeId = createNodeId('image-node');
-
-      // Create a new image node
-      const newNode = {
-        id: newNodeId,
-        type: 'image-node',
+      // Create a new image node using the stored image ID
+      const newNode = await createImageNode(imageId, {
         position: nonOverlappingPosition,
-        data: {
-          imageId, // Use the stored image ID
-          imageUrl: photo.urls.regular, // Keep as fallback
-          source: 'unsplash' as const,
-          photographer: photo.user.name,
-          photographer_url: photo.user.links.html,
-          alt: photo.alt_description || photo.description || 'Unsplash photo',
-          attribution: {
-            service: 'Unsplash',
-            serviceUrl: `https://unsplash.com/?utm_source=${APP_NAME}&utm_medium=referral`,
-            creator: photo.user.name,
-            creatorUrl: `${photo.user.links.html}?utm_source=${APP_NAME}&utm_medium=referral`,
-            photoUrl: `${photo.links.html}?utm_source=${APP_NAME}&utm_medium=referral`,
-          },
+        source: 'unsplash',
+        photographer: photo.user.name,
+        photographer_url: photo.user.links.html,
+        alt: photo.alt_description || photo.description || 'Unsplash photo',
+        attribution: {
+          service: 'Unsplash',
+          serviceUrl: `https://unsplash.com/?utm_source=${APP_NAME}&utm_medium=referral`,
+          creator: photo.user.name,
+          creatorUrl: `${photo.user.links.html}?utm_source=${APP_NAME}&utm_medium=referral`,
+          photoUrl: `${photo.links.html}?utm_source=${APP_NAME}&utm_medium=referral`,
         },
-        selectable: true,
-      };
+      });
 
       // Add the new node to the flow
       setNodes((nds) => [...nds, newNode]);
 
       // Set the node to focus once it's initialized
-      setNodesToFocus(newNodeId);
+      setNodesToFocus(newNode.id);
 
       // Close the sheet
       onOpenChange(false);

@@ -6,8 +6,6 @@ import {
   ControlButton,
   MiniMap,
   addEdge,
-  useNodesState,
-  useEdgesState,
   type OnConnect,
   Panel,
   useReactFlow,
@@ -23,7 +21,7 @@ import {
   apiKeyService,
   imageService,
   preferencesService,
-  db,
+  initializeDatabase,
 } from './services/database';
 
 import '@xyflow/react/dist/style.css';
@@ -35,8 +33,8 @@ import { ArrowDown, Settings, Trash } from 'lucide-react';
 import { DiscordIcon } from './components/ui/discord-icon';
 import { GitHubIcon } from './components/ui/github-icon';
 import { EXTERNAL_LINKS } from './config/links';
-import { createNodeId } from './lib/utils';
-import { useIsMobile } from './lib/hooks';
+import { createNodeId, createImageNode } from './lib/utils';
+import { useIsMobile, usePersistedFlow } from './lib/hooks';
 
 // Import annotation node components
 import {
@@ -107,11 +105,18 @@ const instructionalNodes = [
 
 function Flow() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const {
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    onNodesChange,
+    onEdgesChange,
+    isLoaded,
+  } = usePersistedFlow(instructionalNodes as AppNode[], initialEdges);
+
   const { screenToFlowPosition, getIntersectingNodes, fitView } =
     useReactFlow();
-  const [isLoaded, setIsLoaded] = useState(false);
   const [, setIsDragOver] = useState(false);
   const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
   const [nodesToFocus, setNodesToFocus] = useState<string | null>(null);
@@ -137,76 +142,16 @@ function Flow() {
     onChange: onSelectionChangeHandler,
   });
 
-  // Request persistent storage to prevent data loss
+  // Initialize TinyBase on mount
   useEffect(() => {
-    const requestPersistence = async () => {
-      console.log('Requesting storage persistence');
-      if (navigator.storage && navigator.storage.persist) {
-        console.log('Storage API is available');
-        try {
-          const isPersisted = await navigator.storage.persisted();
-          if (!isPersisted) {
-            const result = await navigator.storage.persist();
-            if (result) {
-              console.log('Storage persistence granted.');
-            } else {
-              console.warn(
-                'Storage persistence not granted. Data may be cleared by the browser.',
-              );
-            }
-          }
-        } catch (error) {
-          console.error('Error requesting storage persistence:', error);
-        }
-      }
-    };
-
-    requestPersistence();
+    initializeDatabase();
   }, []);
-
-  // Load persisted data on mount
-  useEffect(() => {
-    const loadPersistedData = async () => {
-      console.log('Attempting to load persisted data...');
-      try {
-        const [persistedNodes, persistedEdges] = await Promise.all([
-          persistenceService.loadNodes(),
-          persistenceService.loadEdges(),
-        ]);
-
-        console.log('Loaded persisted nodes from service:', persistedNodes);
-        console.log('Loaded persisted edges from service:', persistedEdges);
-
-        if (persistedNodes.length > 0 || persistedEdges.length > 0) {
-          console.log('Found persisted data, setting state...');
-          setNodes(persistedNodes as unknown as AppNode[]);
-          setEdges(persistedEdges);
-        } else {
-          // Load default nodes if no persisted data
-          console.log('No persisted data found, loading default nodes.');
-          setNodes(instructionalNodes as unknown as AppNode[]);
-          setEdges(initialEdges);
-        }
-      } catch (error) {
-        console.error('Failed to load persisted data in App.tsx:', error);
-        // Fallback to default nodes
-        console.log('Error loading data, falling back to default nodes.');
-        setNodes(instructionalNodes as unknown as AppNode[]);
-        setEdges(initialEdges);
-      } finally {
-        setIsLoaded(true);
-        console.log('Data loading process finished.');
-      }
-    };
-
-    loadPersistedData();
-  }, [setNodes, setEdges]);
 
   // Check for API keys on startup and load tutorial preference
   useEffect(() => {
-    const checkApiKeys = async () => {
-      if (!isLoaded) return;
+    if (!isLoaded) return;
 
+    const checkApiKeys = async () => {
       try {
         const hasOpenAiKey = await apiKeyService.hasApiKey('openai');
         if (!hasOpenAiKey) {
@@ -221,13 +166,9 @@ function Flow() {
     };
 
     const loadTutorialPreference = async () => {
-      if (!isLoaded) return;
-
       try {
-        const tutorialDismissed = await preferencesService.getPreference(
-          'tutorial_dismissed',
-          false,
-        );
+        const tutorialDismissed =
+          await preferencesService.getTutorialDismissed();
         setShowTutorialBox(!tutorialDismissed);
       } catch (error) {
         console.error('Failed to load tutorial preference:', error);
@@ -239,36 +180,6 @@ function Flow() {
     checkApiKeys();
     loadTutorialPreference();
   }, [isLoaded]);
-
-  // Save nodes when they change
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    const saveNodes = async () => {
-      try {
-        await persistenceService.saveNodes(nodes);
-      } catch (error) {
-        console.error('Failed to save nodes:', error);
-      }
-    };
-
-    saveNodes();
-  }, [nodes, isLoaded]);
-
-  // Save edges when they change
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    const saveEdges = async () => {
-      try {
-        await persistenceService.saveEdges(edges);
-      } catch (error) {
-        console.error('Failed to save edges:', error);
-      }
-    };
-
-    saveEdges();
-  }, [edges, isLoaded]);
 
   // Find a non-overlapping position for a new node
   const findNonOverlappingPosition = useCallback(
@@ -570,39 +481,16 @@ function Flow() {
               },
             );
 
-            const newNodeId = createNodeId('image-node');
-            const newNode: AppNode = {
-              id: newNodeId,
-              type: 'image-node',
+            const newNode = await createImageNode(imageId, {
               position,
-              data: {
-                imageId, // Use the stored image ID
-                source: 'uploaded' as const,
-                isLoading: false,
-                prompt: `Uploaded: ${file.name}`,
-              },
-              selectable: true,
-            };
+              source: 'uploaded',
+              prompt: `Uploaded: ${file.name}`,
+            });
 
             setNodes((nds) => [...nds, newNode]);
           } catch (error) {
-            console.error('Error storing uploaded image:', error);
-            // Fallback to legacy storage for backward compatibility
-            const newNodeId = createNodeId('image-node');
-            const newNode: AppNode = {
-              id: newNodeId,
-              type: 'image-node',
-              position,
-              data: {
-                imageUrl: imageDataUrl, // Fallback to direct URL storage
-                source: 'uploaded' as const,
-                isLoading: false,
-                prompt: `Uploaded: ${file.name}`,
-              },
-              selectable: true,
-            };
-
-            setNodes((nds) => [...nds, newNode]);
+            console.error('Error creating image node:', error);
+            // Don't create fallback nodes - the error should be handled properly
           }
         };
         reader.readAsDataURL(file);
@@ -614,7 +502,7 @@ function Flow() {
   // Handle tutorial box actions
   const handleTutorialDismiss = useCallback(async () => {
     try {
-      await preferencesService.setPreference('tutorial_dismissed', true);
+      await preferencesService.setTutorialDismissed(true);
       setShowTutorialBox(false);
     } catch (error) {
       console.error('Failed to save tutorial preference:', error);
@@ -638,7 +526,6 @@ function Flow() {
       try {
         // Clear all data from the database except API keys
         await persistenceService.clearAll();
-        await db.images.clear();
 
         // Reset the flow to initial state
         setNodes([]);
@@ -699,13 +586,13 @@ function Flow() {
         </Controls>
         <Panel position="top-left">
           <div
-            className="flex items-center gap-3 mb-2"
+            className="flex items-center gap-2 mb-2"
             style={{ maxWidth: '220px', userSelect: 'none' }}
           >
             <img
               src="/logo.png"
               alt="hitSlop logo"
-              className="w-8 border border-gray-300 rounded shadow-md"
+              className="w-12 border border-gray-300 rounded shadow-md"
             />
             <h1
               className="font-recursive"

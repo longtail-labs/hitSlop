@@ -3,68 +3,142 @@ import { ModelConfig, MODEL_CONFIGS } from '../services/models/modelConfig';
 
 export type ModelId = keyof typeof MODEL_CONFIGS;
 
-// New type for storable generation parameters
-export interface SerializableGenerationParams {
-  prompt: string;
-  model?: ModelId;
-  size?: string;
-  n?: number;
-  sourceImages?: string[]; // These will now be image IDs instead of data URLs
-  maskImage?: string | null; // This will now be an image ID instead of data URL
-  // Include other known serializable parameters from ModelConfig's 'parameters' array
-  // For example, if 'quality', 'background', 'aspectRatio' are common model params:
-  quality?: string;
-  background?: string;
-  moderation?: string;
-  style?: string;
-  aspectRatio?: string;
-  // personGeneration is google specific, but if we want to store it:
-  personGeneration?: string;
-  // Add other potential params here if they should be stored
-  // Or use a more generic approach if the list is too long/dynamic:
-  // [key: string]: any; // Use with caution, prefer explicit properties
-}
-
-export type PromptNodeData = {
-  prompt?: string;
-  model?: ModelId; // Updated to ModelId
-  size?: string;
-  n?: number;
-  // Removed quality, outputFormat, moderation, background, aspectRatio, personGeneration
-  // These are now expected to be part of the 'modelParams' state in PromptNode
-  // and then captured in 'SerializableGenerationParams' for ImageNodeData.
-  onPromptChange?: (_prompt: string) => void; // This seems like a prop, not stored data.
-  sourceImages?: string[]; // These will now be image IDs instead of data URLs
-  maskImage?: string | null; // This will now be an image ID instead of data URL
-  // [key: string]: any; // Removed, let PromptNode manage dynamic params in its state.
-};
-export type PromptNode = Node<PromptNodeData, 'prompt-node'>;
-
-export type ImageNodeData = {
-  // New optimized storage: store image ID instead of full data URL
+// Base for all image nodes
+export interface BaseImageNodeData {
   imageId?: string;
-  // Keep imageUrl for backward compatibility during transition, but prefer imageId
-  imageUrl?: string; // @deprecated - use imageId instead
-  prompt?: string; // The original prompt that led to this image
-  generationParams?: SerializableGenerationParams; // Updated to SerializableGenerationParams
   isLoading?: boolean;
   error?: string;
-  isEdited?: boolean;
-  revisedPrompt?: string;
-  isStreaming?: boolean;
-  partialImageUrl?: string;
-  streamingProgress?: string;
-  modelConfig?: ModelConfig; // This is good, provides full context of the model used
-  source?: 'generated' | 'uploaded' | 'edited' | 'unsplash' | 'pexels'; // Image source type
-  // Legacy attribution for backward compatibility
-  attribution?: {
-    service: string;
-    serviceUrl: string;
+  [key:string]: any;
+}
+
+// For images uploaded by the user
+export interface LocalImageNodeData extends BaseImageNodeData {
+  source: 'uploaded';
+}
+export type LocalImageNode = Node<LocalImageNodeData, 'image-node'>;
+
+// For images from Unsplash
+export interface UnsplashImageNodeData extends BaseImageNodeData {
+  source: 'unsplash';
+  prompt?: string;
+  photographer: string;
+  photographer_url: string;
+  alt?: string;
+  attribution: {
+    service: 'Unsplash';
+    serviceUrl: 'https://unsplash.com';
     creator: string;
     creatorUrl: string;
     photoUrl: string;
   };
-};
+}
+export type UnsplashImageNode = Node<UnsplashImageNodeData, 'image-node'>;
+
+// Base for all generated/edited images
+interface BaseGeneratedImageNodeData extends BaseImageNodeData {
+  source: 'generated' | 'edited';
+  prompt: string;
+  isEdited: boolean;
+  revisedPrompt?: string;
+  modelConfig: ModelConfig;
+  // Streaming-related fields
+  isStreaming?: boolean;
+  partialImageUrl?: string;
+  streamingProgress?: string;
+}
+
+// --- Generation Parameter Types ---
+
+export interface BaseGenerationParams {
+  prompt: string;
+  model: ModelId;
+  n?: number;
+  sourceImages?: string[]; // image IDs
+  maskImage?: string | null; // image ID
+}
+
+export interface OpenAIGenerationParams extends BaseGenerationParams {
+  size?: string;
+  quality?: string;
+  style?: string;
+  background?: string; // Custom param
+}
+
+export interface GeminiGenerationParams extends BaseGenerationParams {
+  size?: string;
+  aspectRatio?: string;
+  personGeneration?: string;
+}
+
+export interface FalGenerationParams extends BaseGenerationParams {
+  guidance_scale?: number;
+  seed?: number;
+  aspect_ratio?: string;
+}
+
+export type SerializableGenerationParams =
+  | OpenAIGenerationParams
+  | GeminiGenerationParams
+  | FalGenerationParams;
+
+// --- Specific Generated Image Node Data Types ---
+
+export interface OpenAIGeneratedImageNodeData extends BaseGeneratedImageNodeData {
+  generationParams: OpenAIGenerationParams;
+}
+export type OpenAIGeneratedImageNode = Node<
+  OpenAIGeneratedImageNodeData,
+  'image-node'
+>;
+
+export interface GeminiGeneratedImageNodeData extends BaseGeneratedImageNodeData {
+  generationParams: GeminiGenerationParams;
+}
+export type GeminiGeneratedImageNode = Node<
+  GeminiGeneratedImageNodeData,
+  'image-node'
+>;
+
+export interface FalGeneratedImageNodeData extends BaseGeneratedImageNodeData {
+  generationParams: FalGenerationParams;
+}
+export type FalGeneratedImageNode = Node<
+  FalGeneratedImageNodeData,
+  'image-node'
+>;
+
+// Union of all generated image data types
+export type GeneratedImageNodeData =
+  | OpenAIGeneratedImageNodeData
+  | GeminiGeneratedImageNodeData
+  | FalGeneratedImageNodeData;
+export type GeneratedImageNode = Node<GeneratedImageNodeData, 'image-node'>;
+
+// A specific type for the temporary loading state
+export interface LoadingImageNodeData extends BaseImageNodeData {
+  source: 'generated' | 'edited';
+  isLoading: true;
+  prompt?: string;
+}
+export type LoadingImageNode = Node<LoadingImageNodeData, 'image-node'>;
+
+// The main ImageNodeData is a union of all specific image types
+export type ImageNodeData =
+  | LocalImageNodeData
+  | UnsplashImageNodeData
+  | GeneratedImageNodeData
+  | LoadingImageNodeData;
 export type ImageNode = Node<ImageNodeData, 'image-node'>;
 
+// --- Prompt Node ---
+export interface PromptNodeData {
+  prompt?: string;
+  model?: ModelId;
+  sourceImages?: string[]; // Image IDs
+  // No other dynamic params needed here; they are managed inside PromptNode state
+  [key: string]: any;
+}
+export type PromptNode = Node<PromptNodeData, 'prompt-node'>;
+
+// --- App Node ---
 export type AppNode = BuiltInNode | PromptNode | ImageNode;

@@ -18,7 +18,11 @@ import {
 import { ImageIcon, Upload, X } from 'lucide-react';
 import { ModelParameterControls } from '@/app/components/ModelParameterControls';
 import { imageService } from '@/app/services/database';
-import { createNodeId, createEdgeId } from '@/app/lib/utils';
+import {
+  createNodeId,
+  createEdgeId,
+  createLoadingImageNode,
+} from '@/app/lib/utils';
 
 export function PromptNode({ data, id, selected }: NodeProps) {
   const reactFlowInstance = useReactFlow();
@@ -69,22 +73,17 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     const resolveDisplayImages = async () => {
       const resolvedUrls: string[] = [];
 
-      for (const imageRef of sourceImages) {
-        if (imageRef.startsWith('data:')) {
-          // Already a data URL
-          resolvedUrls.push(imageRef);
-        } else {
-          // Assume it's an image ID, try to resolve
-          try {
-            const imageUrl = await imageService.getImage(imageRef);
-            if (imageUrl) {
-              resolvedUrls.push(imageUrl);
-            } else {
-              console.warn(`Image ID ${imageRef} not found in storage`);
-            }
-          } catch (error) {
-            console.error(`Error resolving image ID ${imageRef}:`, error);
+      for (const imageId of sourceImages) {
+        // Assume it's an image ID, try to resolve
+        try {
+          const imageUrl = await imageService.getImage(imageId);
+          if (imageUrl) {
+            resolvedUrls.push(imageUrl);
+          } else {
+            console.warn(`Image ID ${imageId} not found in storage`);
           }
+        } catch (error) {
+          console.error(`Error resolving image ID ${imageId}:`, error);
         }
       }
 
@@ -191,8 +190,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           setSourceImages((prev) => [...prev, imageId]);
         } catch (error) {
           console.error('Error storing uploaded image:', error);
-          // Fallback to storing the data URL directly
-          setSourceImages((prev) => [...prev, base64String]);
+          setError('Failed to store uploaded image.');
         }
       };
       reader.readAsDataURL(file);
@@ -241,15 +239,10 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           i,
         );
 
-        const loadingImageNode: AppNode = {
-          id: imageNodeId,
-          type: 'image-node',
-          position: nonOverlappingPosition,
-          data: {
-            isLoading: true,
-            prompt: prompt,
-          },
-        };
+        const loadingImageNode: AppNode = createLoadingImageNode(
+          nonOverlappingPosition,
+          prompt,
+        );
 
         loadingImageNodes.push(loadingImageNode);
         addNodes(loadingImageNode);
