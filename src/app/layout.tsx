@@ -13,9 +13,9 @@ const recursive = Recursive({
 });
 
 export const metadata: Metadata = {
-  title: 'hitSlop.com - Vibe Playground',
+  title: 'hitSlop.com - Gen AI Vibing Playground',
   description:
-    'hitSlop is a creative vibe playground where ideas come to life through AI. Effortlessly create, morph, and imagine visual concepts through an intuitive flow-based canvas. Currently focused on image generation, with more creative tools coming soon.',
+    'hitSlop is a creative vibe playground where ideas come to life through Gen AI. Effortlessly create, morph, and imagine visual concepts through an intuitive flow-based canvas. Currently focused on image generation, with more creative tools coming soon.',
   applicationName: 'hitSlop',
   keywords: [
     'AI Creativity',
@@ -36,9 +36,9 @@ export const metadata: Metadata = {
   publisher: 'hitSlop',
   metadataBase: new URL('https://hitslop.com'),
   openGraph: {
-    title: 'hitSlop - Creative AI Playground',
+    title: 'hitSlop - Creative Gen AI Vibing Playground',
     description:
-      'Bring your ideas to life through AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
+      'Bring your ideas to life through Gen AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
     url: 'https://hitslop.com',
     siteName: 'hitSlop',
     images: [
@@ -54,9 +54,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'hitSlop - Creative AI Playground',
+    title: 'hitSlop - Creative Gen AI Vibing Playground',
     description:
-      'Bring your ideas to life through AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
+      'Bring your ideas to life through Gen AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
     images: ['/logo.png'],
   },
   icons: {
