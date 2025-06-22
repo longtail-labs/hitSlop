@@ -17,8 +17,8 @@ export interface ModelParameter {
   default?: any;
   label: string;
   description?: string;
-  dependsOn?: string[]; // Other parameters this depends on
-  enabledWhen?: Record<string, any>; // Conditions when this parameter is available
+  dependsOn?: string[];
+  enabledWhen?: Record<string, any>;
 }
 
 export interface ModelConfig {
@@ -36,29 +36,66 @@ export interface ModelConfig {
   avgLatency: 'fast' | 'medium' | 'slow';
 }
 
+// Common parameter definitions to reduce repetition
+const QUALITY_PARAM: ModelParameter = {
+  name: 'quality',
+  type: 'select',
+  options: ['auto', 'low', 'medium', 'high'],
+  default: 'auto',
+  label: 'Quality',
+  description: 'Image quality level'
+};
+
+const ASPECT_RATIO_PARAM: ModelParameter = {
+  name: 'aspectRatio',
+  type: 'select',
+  options: ['1:1', '3:4', '4:3', '9:16', '16:9'],
+  default: '1:1',
+  label: 'Aspect Ratio',
+  description: 'Image aspect ratio'
+};
+
+const GUIDANCE_SCALE_PARAM: ModelParameter = {
+  name: 'guidance_scale',
+  type: 'number',
+  default: 3.5,
+  label: 'Guidance Scale',
+  description: 'How closely the model should follow your prompt (1-20)'
+};
+
+const SEED_PARAM: ModelParameter = {
+  name: 'seed',
+  type: 'number',
+  label: 'Seed',
+  description: 'Random seed for reproducible results (optional)'
+};
+
+// Base configurations to reduce repetition
+const BASE_OPENAI_CONFIG = {
+  provider: 'openai' as ModelProvider,
+  apiEndpoint: 'image' as const,
+  defaultSize: '1024x1024',
+  supportedSizes: ['1024x1024', '1536x1024', '1024x1536'],
+};
+
+const BASE_GOOGLE_CONFIG = {
+  provider: 'google' as ModelProvider,
+  apiEndpoint: 'imagen' as const,
+  defaultSize: '1024x1024',
+  supportedSizes: ['1024x1024'],
+  maxImages: 4,
+  avgLatency: 'medium' as const,
+};
+
 export const MODEL_CONFIGS: Record<string, ModelConfig> = {
   'gpt-image-1': {
+    ...BASE_OPENAI_CONFIG,
     id: 'gpt-image-1',
     name: 'GPT Image 1',
-    provider: 'openai',
     description: 'Latest multimodal model with superior instruction following',
-    capabilities: [
-      'generation',
-      'editing',
-      'inpainting',
-      'multi_turn',
-      'transparent_background',
-      'high_quality'
-    ],
+    capabilities: ['generation', 'editing', 'inpainting', 'multi_turn', 'transparent_background', 'high_quality'],
     parameters: [
-      {
-        name: 'quality',
-        type: 'select',
-        options: ['auto', 'low', 'medium', 'high'],
-        default: 'auto',
-        label: 'Quality',
-        description: 'Image quality level'
-      },
+      QUALITY_PARAM,
       {
         name: 'background',
         type: 'select',
@@ -69,28 +106,18 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
       }
     ],
     maxImages: 10,
-    defaultSize: '1024x1024',
-    supportedSizes: ['1024x1024', '1536x1024', '1024x1536'],
-    apiEndpoint: 'image',
     costTier: 'high',
     avgLatency: 'medium'
   },
 
   'dall-e-3': {
+    ...BASE_OPENAI_CONFIG,
     id: 'dall-e-3',
     name: 'DALL-E 3',
-    provider: 'openai',
     description: 'High-quality image generation with improved prompt understanding',
     capabilities: ['generation', 'high_quality'],
     parameters: [
-      {
-        name: 'quality',
-        type: 'select',
-        options: ['standard', 'hd'],
-        default: 'standard',
-        label: 'Quality',
-        description: 'Image quality level'
-      },
+      { ...QUALITY_PARAM, options: ['standard', 'hd'], default: 'standard' },
       {
         name: 'style',
         type: 'select',
@@ -101,86 +128,52 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
       }
     ],
     maxImages: 1,
-    defaultSize: '1024x1024',
     supportedSizes: ['1024x1024', '1024x1792', '1792x1024'],
-    apiEndpoint: 'image',
     costTier: 'medium',
     avgLatency: 'medium'
   },
 
   'dall-e-2': {
+    ...BASE_OPENAI_CONFIG,
     id: 'dall-e-2',
     name: 'DALL-E 2',
-    provider: 'openai',
     description: 'Lower cost option with editing and variations support',
     capabilities: ['generation', 'editing', 'inpainting', 'variations'],
     parameters: [],
     maxImages: 10,
-    defaultSize: '1024x1024',
     supportedSizes: ['256x256', '512x512', '1024x1024'],
-    apiEndpoint: 'image',
     costTier: 'low',
     avgLatency: 'fast'
   },
 
   'imagen-3.0-generate-002': {
+    ...BASE_GOOGLE_CONFIG,
     id: 'imagen-3.0-generate-002',
     name: 'Imagen 3',
-    provider: 'google',
     description: 'Google\'s flagship image generation model with photorealistic quality',
     capabilities: ['generation', 'high_quality', 'aspect_ratios'],
-    parameters: [
-      {
-        name: 'aspectRatio',
-        type: 'select',
-        options: ['1:1', '3:4', '4:3', '9:16', '16:9'],
-        default: '1:1',
-        label: 'Aspect Ratio',
-        description: 'Image aspect ratio'
-      }
-    ],
-    maxImages: 4,
-    defaultSize: '1024x1024',
-    supportedSizes: ['1024x1024'],
-    apiEndpoint: 'imagen',
-    costTier: 'medium',
-    avgLatency: 'medium'
+    parameters: [ASPECT_RATIO_PARAM],
+    costTier: 'medium'
   },
 
   'imagen-3.0-fast-generate-001': {
+    ...BASE_GOOGLE_CONFIG,
     id: 'imagen-3.0-fast-generate-001',
     name: 'Imagen 3 Fast',
-    provider: 'google',
     description: 'Faster version of Imagen 3 with slightly lower quality',
     capabilities: ['generation', 'aspect_ratios'],
-    parameters: [
-      {
-        name: 'aspectRatio',
-        type: 'select',
-        options: ['1:1', '3:4', '4:3', '9:16', '16:9'],
-        default: '1:1',
-        label: 'Aspect Ratio',
-        description: 'Image aspect ratio'
-      }
-    ],
-    maxImages: 4,
-    defaultSize: '1024x1024',
-    supportedSizes: ['1024x1024'],
-    apiEndpoint: 'imagen',
+    parameters: [ASPECT_RATIO_PARAM],
     costTier: 'low',
     avgLatency: 'fast'
   },
 
   'gemini-2.0-flash-preview-image-generation': {
+    ...BASE_GOOGLE_CONFIG,
     id: 'gemini-2.0-flash-preview-image-generation',
     name: 'Gemini 2.0 Flash',
-    provider: 'google',
     description: 'Multimodal model that can generate images as part of conversations',
     capabilities: ['generation', 'editing', 'multi_turn'],
     parameters: [],
-    maxImages: 4,
-    defaultSize: '1024x1024',
-    supportedSizes: ['1024x1024'],
     apiEndpoint: 'gemini',
     costTier: 'medium',
     avgLatency: 'fast'
@@ -193,13 +186,7 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
     description: 'Intelligent FLUX model that switches between text-to-image generation, single image editing, and multi-image editing based on context',
     capabilities: ['generation', 'editing', 'high_quality', 'aspect_ratios'],
     parameters: [
-      {
-        name: 'guidance_scale',
-        type: 'number',
-        default: 3.5,
-        label: 'Guidance Scale',
-        description: 'How closely the model should follow your prompt (1-20)'
-      },
+      GUIDANCE_SCALE_PARAM,
       {
         name: 'aspect_ratio',
         type: 'select',
@@ -208,14 +195,9 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
         label: 'Aspect Ratio',
         description: 'Image aspect ratio'
       },
-      {
-        name: 'seed',
-        type: 'number',
-        label: 'Seed',
-        description: 'Random seed for reproducible results (optional)'
-      }
+      SEED_PARAM
     ],
-    maxImages: 10, // Increased to support multi-image editing
+    maxImages: 10,
     defaultSize: '1024x1024',
     supportedSizes: ['1024x1024'],
     apiEndpoint: 'fal',

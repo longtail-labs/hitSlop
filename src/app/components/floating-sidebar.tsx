@@ -15,9 +15,9 @@ import {
 } from '@/app/components/ui/tooltip';
 import { UnsplashSheet } from './unsplash-sheet';
 import { useFilePicker } from 'use-file-picker';
-import { imageService } from '@/app/services/database';
-import { createNodeId } from '@/app/lib/utils';
+import { createImageNode } from '@/app/lib/utils';
 import { useReactFlow } from '@xyflow/react';
+import { imageService } from '@/app/services/database';
 
 interface FloatingSidebarProps {
   findNonOverlappingPosition: (
@@ -38,79 +38,48 @@ export function FloatingSidebar({
     readAs: 'DataURL',
     accept: 'image/*',
     multiple: true,
-    onFilesSelected: ({ plainFiles, filesContent }) => {
+    onFilesSelected: async ({ plainFiles, filesContent }) => {
       if (!plainFiles || plainFiles.length === 0) return;
 
       // Get initial position for the first node
       const initialPosition = { x: 100, y: 100 };
       let lastPosition = initialPosition;
 
-      // Process each file
-      filesContent.forEach((file, _index) => {
-        if (!file.content) return;
+      // Process each file sequentially
+      for (const file of filesContent) {
+        if (!file.content) continue;
 
         // Get non-overlapping position for this node
-        // Offset each node a bit from the previous one for better visualization
         lastPosition = findNonOverlappingPosition(
           { x: lastPosition.x + 20, y: lastPosition.y + 20 },
           'image-node',
         );
 
-        // Generate a unique node ID
-        const nodeId = createNodeId('image-node');
+        try {
+          // First, store the image to get a persistent ID
+          const imageId = await imageService.storeImage(
+            file.content,
+            'uploaded',
+          );
 
-        // Store the image and create the node - following the same pattern as App.tsx drag-and-drop
-        imageService
-          .storeImage(file.content, 'uploaded', {})
-          .then((imageId) => {
-            // Create a new image node with imageId
-            const newNode = {
-              id: nodeId,
-              type: 'image-node',
-              position: lastPosition,
-              data: {
-                imageId,
-                source: 'uploaded' as const,
-                isLoading: false,
-                prompt: `Uploaded: ${file.name}`,
-              },
-              selectable: true,
-            };
-
-            // Add the node to the flow using setNodes like in App.tsx
-            setNodes((nds) => [...nds, newNode]);
-
-            // Focus on the newly created node
-            setTimeout(() => {
-              setNodesToFocus(nodeId);
-            }, 100);
-          })
-          .catch((error) => {
-            console.error('Error processing uploaded image:', error);
-
-            // Fallback to direct URL method if there was an error
-            const newNode = {
-              id: nodeId,
-              type: 'image-node',
-              position: lastPosition,
-              data: {
-                imageUrl: file.content,
-                source: 'uploaded' as const,
-                isLoading: false,
-                prompt: `Uploaded: ${file.name}`,
-              },
-              selectable: true,
-            };
-
-            // Add the node to the flow using setNodes
-            setNodes((nds) => [...nds, newNode]);
-
-            // Focus on the newly created node
-            setTimeout(() => {
-              setNodesToFocus(nodeId);
-            }, 100);
+          // Now create the node using the ID
+          const newNode = createImageNode(imageId, {
+            position: lastPosition,
+            source: 'uploaded',
+            prompt: `Uploaded: ${file.name}`,
           });
-      });
+
+          // Add the node to the flow using setNodes like in App.tsx
+          setNodes((nds) => [...nds, newNode]);
+
+          // Focus on the newly created node
+          setTimeout(() => {
+            setNodesToFocus(newNode.id);
+          }, 100);
+        } catch (error) {
+          console.error('Error processing uploaded image:', error);
+        }
+      }
     },
   });
 
