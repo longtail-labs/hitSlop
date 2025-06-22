@@ -37,7 +37,7 @@ export function MobileView({ onPlayClick }: MobileViewProps) {
               '"MONO" 0.3, "wght" 600, "CASL" 0.8, "CRSV" 0.5',
           }}
         >
-          Gen AI Vibing Playground
+          Image Gen Playground
         </h2>
 
         <div
@@ -49,7 +49,7 @@ export function MobileView({ onPlayClick }: MobileViewProps) {
           }}
         >
           <p>Create and edit images with OpenAI, Gemini, and FLUX</p>
-          <p>Visual node-based workflow for AI image generation</p>
+          <p>Flow-based canvas for AI-powered image generation</p>
         </div>
       </div>
 

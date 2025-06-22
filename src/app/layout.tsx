@@ -13,32 +13,32 @@ const recursive = Recursive({
 });
 
 export const metadata: Metadata = {
-  title: 'hitSlop.com - Gen AI Vibing Playground',
+  title: 'hitSlop.com - Image Gen Playground',
   description:
-    'hitSlop is a creative vibe playground where ideas come to life through Gen AI. Effortlessly create, morph, and imagine visual concepts through an intuitive flow-based canvas. Currently focused on image generation, with more creative tools coming soon.',
+    'hitSlop is an intuitive image generation playground powered by AI. Create, edit, and explore visual concepts through a flow-based canvas using OpenAI, Gemini, and FLUX models.',
   applicationName: 'hitSlop',
   keywords: [
-    'AI Creativity',
-    'Visual Playground',
-    'Creative Flow',
-    'AI Dreams',
-    'Image Generation',
+    'AI Image Generation',
+    'Image Gen Playground',
+    'AI Art Creation',
+    'Visual AI Studio',
+    'Image Editing AI',
     'Creative Canvas',
-    'Visual Imagination',
-    'AI Art Studio',
-    'Creative Workflows',
-    'Generative Creativity',
+    'AI Art Generator',
+    'Image Creation Tool',
     'Visual AI Playground',
-    'Creative Expression',
+    'AI Image Editor',
+    'Generative Art',
+    'Creative AI Tools',
   ],
   authors: [{ name: 'hitSlop', url: 'https://hitslop.com' }],
   creator: 'hitSlop',
   publisher: 'hitSlop',
   metadataBase: new URL('https://hitslop.com'),
   openGraph: {
-    title: 'hitSlop - Creative Gen AI Vibing Playground',
+    title: 'hitSlop - Image Gen Playground',
     description:
-      'Bring your ideas to life through Gen AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
+      'Create and edit images with AI using OpenAI, Gemini, and FLUX. An intuitive flow-based canvas for visual creativity.',
     url: 'https://hitslop.com',
     siteName: 'hitSlop',
     images: [
@@ -54,9 +54,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'hitSlop - Creative Gen AI Vibing Playground',
+    title: 'hitSlop - Image Gen Playground',
     description:
-      'Bring your ideas to life through Gen AI. Create, morph, and explore visual concepts with an intuitive creative playground.',
+      'Create and edit images with AI using OpenAI, Gemini, and FLUX. An intuitive flow-based canvas for visual creativity.',
     images: ['/logo.png'],
   },
   icons: {

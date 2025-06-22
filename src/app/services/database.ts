@@ -30,7 +30,7 @@ export const tablesSchema = {
   },
   images: {
     id: { type: 'string' },
-    imageData: { type: 'string' }, // Base64 data URL
+    imageData: { type: 'string' }, // Base64 data URL or HTTP URL (depending on source)
     mimeType: { type: 'string' },
     size: { type: 'number' },
     createdAt: { type: 'number' },
@@ -343,19 +343,27 @@ export const apiKeyService = {
 // Image service
 export const imageService = {
   async storeImage(
-    imageDataUrl: string,
+    imageDataUrl: string, // Can be a data URL (for uploaded/generated) or HTTP URL (for Unsplash)
     source: 'generated' | 'uploaded' | 'edited' | 'unsplash' = 'generated',
     metadata?: { width?: number; height?: number; tags?: string[] }
   ): Promise<string> {
     const imageId = createImageId();
 
-    // Extract MIME type from data URL
-    const mimeMatch = imageDataUrl.match(/^data:([^;]+);base64,/);
-    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+    // Handle MIME type and size calculation based on URL type
+    let mimeType: string;
+    let approximateSize: number;
 
-    // Calculate approximate size
-    const base64Data = imageDataUrl.split(',')[1] || '';
-    const approximateSize = Math.floor(base64Data.length * 0.75);
+    if (imageDataUrl.startsWith('data:')) {
+      // Data URL - extract MIME type and calculate size from base64
+      const mimeMatch = imageDataUrl.match(/^data:([^;]+);base64,/);
+      mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+      const base64Data = imageDataUrl.split(',')[1] || '';
+      approximateSize = Math.floor(base64Data.length * 0.75);
+    } else {
+      // HTTP URL - default values (we can't easily calculate size without fetching)
+      mimeType = 'image/jpeg'; // Most Unsplash images are JPEG
+      approximateSize = 0; // Unknown size for HTTP URLs
+    }
 
     mainStore.setRow('images', imageId, {
       id: imageId,

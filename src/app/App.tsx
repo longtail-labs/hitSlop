@@ -617,7 +617,7 @@ function Flow() {
               fontSize: '16px',
             }}
           >
-            Gen AI Vibing Playground
+            Image Gen Playground
           </h3>
           <div
             className="font-recursive"

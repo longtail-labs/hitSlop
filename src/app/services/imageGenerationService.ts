@@ -28,7 +28,31 @@ export interface OperationResult {
 }
 
 /**
+ * Convert HTTP URL to data URL by fetching and converting to base64
+ */
+async function httpUrlToDataUrl(url: string): Promise<string> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to convert blob to data URL'));
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    throw new Error(`Failed to convert HTTP URL to data URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
  * Simple helper to resolve image IDs to data URLs for API calls
+ * Handles both data URLs (for uploaded/generated images) and HTTP URLs (for Unsplash images)
  */
 async function getImageDataUrls(imageIds: string[]): Promise<string[]> {
   const dataUrls: string[] = [];
@@ -37,7 +61,18 @@ async function getImageDataUrls(imageIds: string[]): Promise<string[]> {
     try {
       const imageData = await imageService.getImage(imageId);
       if (imageData) {
-        dataUrls.push(imageData);
+        // Check if it's already a data URL or an HTTP URL
+        if (imageData.startsWith('data:')) {
+          // Already a data URL, use as-is
+          dataUrls.push(imageData);
+        } else if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+          // HTTP URL (likely Unsplash), convert to data URL
+          console.log(`Converting HTTP URL to data URL for image ${imageId}`);
+          const dataUrl = await httpUrlToDataUrl(imageData);
+          dataUrls.push(dataUrl);
+        } else {
+          console.warn(`Unexpected image data format for ${imageId}:`, imageData.substring(0, 50));
+        }
       } else {
         console.warn(`Image not found: ${imageId}`);
       }
