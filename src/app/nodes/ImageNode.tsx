@@ -67,16 +67,50 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nodes) => nodes.filter((node) => node.id !== id));
   }, [id, setNodes]);
 
-  const handleDownload = useCallback(() => {
-    if (currentImageUrl) {
+  const handleDownload = useCallback(async () => {
+    if (!currentImageUrl) return;
+
+    try {
+      // Fetch the image data, whether it's a data URL or a remote URL
+      const response = await fetch(currentImageUrl);
+      if (!response.ok) {
+        throw new Error('Network response was not ok.');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = currentImageUrl;
-      link.download = `image-${Date.now()}.png`;
+      link.href = url;
+
+      // Attempt to create a more descriptive filename
+      const getFilename = () => {
+        if (nodeData.source === 'unsplash' && nodeData.alt) {
+          return `${nodeData.alt
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .substring(0, 50)}.png`;
+        }
+        if (nodeData.prompt) {
+          return `${String(nodeData.prompt)
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .substring(0, 50)}.png`;
+        }
+        return `image-${Date.now()}.png`;
+      };
+
+      link.download = getFilename();
       document.body.appendChild(link);
       link.click();
+
+      // Cleanup
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Image download failed:', error);
+      // Fallback: open in a new tab if fetch fails (e.g., CORS)
+      window.open(currentImageUrl, '_blank');
     }
-  }, [currentImageUrl]);
+  }, [currentImageUrl, nodeData]);
 
   const findNonOverlappingPosition = useCallback(
     (

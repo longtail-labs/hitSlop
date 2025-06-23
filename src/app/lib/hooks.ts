@@ -37,10 +37,8 @@ export function usePersistedNodes<NodeType extends Node = Node>(
 
   const debouncedSave = useRef(
     debounce((changes: NodeChange[]) => {
-      console.log('🔄 Debounced save - applying node changes:', changes);
       try {
         persistenceService.applyNodeChanges(changes);
-        console.log('✅ Node changes applied successfully');
       } catch (error) {
         console.error('❌ Error applying node changes:', error);
       }
@@ -49,10 +47,8 @@ export function usePersistedNodes<NodeType extends Node = Node>(
 
   const debouncedFullSave = useRef(
     debounce((nodes: NodeType[]) => {
-      console.log('🔄 Debounced full save - saving all nodes:', nodes.length);
       try {
         persistenceService.saveNodes(nodes);
-        console.log('✅ Full node save completed');
       } catch (error) {
         console.error('❌ Error in full node save:', error);
       }
@@ -61,14 +57,11 @@ export function usePersistedNodes<NodeType extends Node = Node>(
 
   useEffect(() => {
     const load = async () => {
-      console.log('📥 Loading persisted nodes...');
       try {
         const persistedNodes = await persistenceService.loadNodes();
         if (persistedNodes.length > 0) {
-          console.log('✅ Loaded persisted nodes:', persistedNodes.length);
           setNodes(persistedNodes as NodeType[]);
         } else {
-          console.log('📝 No persisted nodes, using initial nodes:', initialNodes.length);
           setNodes(initialNodes);
         }
         setIsLoaded(true);
@@ -83,14 +76,12 @@ export function usePersistedNodes<NodeType extends Node = Node>(
 
   useEffect(() => {
     if (isLoaded && nodes.length > 0) {
-      console.log('🔄 Nodes changed, triggering full save...');
       debouncedFullSave(nodes);
     }
   }, [nodes, isLoaded, debouncedFullSave]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<NodeType>[]) => {
-      console.log('🔄 Node changes received:', changes);
       onNodesChange(changes);
       if (isLoaded) {
         debouncedSave(changes as NodeChange[]);
@@ -101,14 +92,12 @@ export function usePersistedNodes<NodeType extends Node = Node>(
 
   const handleSetNodes = useCallback(
     (nodesArg: SetStateAction<NodeType[]>) => {
-      console.log('🔄 SetNodes called');
       setNodes(nodesArg);
       if (isLoaded) {
         const newNodes =
           typeof nodesArg === 'function'
             ? nodesArg(nodesRef.current)
             : nodesArg;
-        console.log('💾 Immediate save for setNodes:', newNodes.length);
         persistenceService.saveNodes(newNodes);
       }
     },
@@ -128,10 +117,8 @@ export function usePersistedEdges<EdgeType extends Edge = Edge>(
 
   const debouncedSave = useRef(
     debounce((changes: EdgeChange[]) => {
-      console.log('🔄 Debounced save - applying edge changes:', changes);
       try {
         persistenceService.applyEdgeChanges(changes);
-        console.log('✅ Edge changes applied successfully');
       } catch (error) {
         console.error('❌ Error applying edge changes:', error);
       }
@@ -140,10 +127,8 @@ export function usePersistedEdges<EdgeType extends Edge = Edge>(
 
   const debouncedFullSave = useRef(
     debounce((edges: EdgeType[]) => {
-      console.log('🔄 Debounced full save - saving all edges:', edges.length);
       try {
         persistenceService.saveEdges(edges);
-        console.log('✅ Full edge save completed');
       } catch (error) {
         console.error('❌ Error in full edge save:', error);
       }
@@ -152,14 +137,11 @@ export function usePersistedEdges<EdgeType extends Edge = Edge>(
 
   useEffect(() => {
     const load = async () => {
-      console.log('📥 Loading persisted edges...');
       try {
         const persistedEdges = await persistenceService.loadEdges();
         if (persistedEdges.length > 0) {
-          console.log('✅ Loaded persisted edges:', persistedEdges.length);
           setEdges(persistedEdges as EdgeType[]);
         } else {
-          console.log('📝 No persisted edges, using initial edges:', initialEdges.length);
           setEdges(initialEdges);
         }
         setIsLoaded(true);
@@ -174,14 +156,12 @@ export function usePersistedEdges<EdgeType extends Edge = Edge>(
 
   useEffect(() => {
     if (isLoaded && edges.length >= 0) {
-      console.log('🔄 Edges changed, triggering full save...');
       debouncedFullSave(edges);
     }
   }, [edges, isLoaded, debouncedFullSave]);
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange<EdgeType>[]) => {
-      console.log('🔄 Edge changes received:', changes);
       onEdgesChange(changes);
       if (isLoaded) {
         debouncedSave(changes as EdgeChange[]);
@@ -192,14 +172,12 @@ export function usePersistedEdges<EdgeType extends Edge = Edge>(
 
   const handleSetEdges = useCallback(
     (edgesArg: SetStateAction<EdgeType[]>) => {
-      console.log('🔄 SetEdges called');
       setEdges(edgesArg);
       if (isLoaded) {
         const newEdges =
           typeof edgesArg === 'function'
             ? edgesArg(edgesRef.current)
             : edgesArg;
-        console.log('💾 Immediate save for setEdges:', newEdges.length);
         persistenceService.saveEdges(newEdges);
       }
     },
@@ -222,7 +200,6 @@ export function usePersistedFlow<NodeType extends Node = Node, EdgeType extends 
 
   useEffect(() => {
     if (isLoaded && !hasFitView.current && nodes.length > 0) {
-      console.log('🎯 Fitting view to show all content...');
       setTimeout(() => {
         fitView({
           duration: 800,
