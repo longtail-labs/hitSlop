@@ -13,6 +13,7 @@ import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
 import { createImageNode } from '@/app/lib/utils';
 import { imageService } from '@/app/services/database';
+import { useNodePlacement } from '@/app/lib/useNodePlacement';
 
 interface UnsplashPhoto {
   id: string;
@@ -54,10 +55,6 @@ interface UnsplashResponse {
 interface UnsplashSheetProps {
   isOpen: boolean;
   onOpenChange: (_open: boolean) => void;
-  findNonOverlappingPosition: (
-    _initialPosition: { x: number; y: number },
-    _nodeType: string,
-  ) => { x: number; y: number };
   setNodesToFocus: (_nodeId: string | null) => void;
 }
 
@@ -117,10 +114,10 @@ const PhotoCard = ({
 export function UnsplashSheet({
   isOpen,
   onOpenChange,
-  findNonOverlappingPosition,
   setNodesToFocus,
 }: UnsplashSheetProps) {
   const { setNodes, screenToFlowPosition } = useReactFlow();
+  const { findNonOverlappingPosition } = useNodePlacement();
   const [searchQuery, setSearchQuery] = useState('');
   const [photos, setPhotos] = useState<EnhancedUnsplashPhoto[]>([]);
   const [loading, setLoading] = useState(false);

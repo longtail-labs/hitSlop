@@ -18,21 +18,16 @@ import { useFilePicker } from 'use-file-picker';
 import { createImageNode } from '@/app/lib/utils';
 import { useReactFlow } from '@xyflow/react';
 import { imageService } from '@/app/services/database';
+import { useNodePlacement } from '@/app/lib/useNodePlacement';
 
 interface FloatingSidebarProps {
-  findNonOverlappingPosition: (
-    _initialPosition: { x: number; y: number },
-    _nodeType: string,
-  ) => { x: number; y: number };
   setNodesToFocus: (_nodeId: string | null) => void;
 }
 
-export function FloatingSidebar({
-  findNonOverlappingPosition,
-  setNodesToFocus,
-}: FloatingSidebarProps) {
+export function FloatingSidebar({ setNodesToFocus }: FloatingSidebarProps) {
   const [isUnsplashOpen, setIsUnsplashOpen] = useState(false);
   const { setNodes } = useReactFlow();
+  const { findNonOverlappingPosition } = useNodePlacement();
 
   const { openFilePicker, loading, errors } = useFilePicker({
     readAs: 'DataURL',
@@ -327,7 +322,6 @@ export function FloatingSidebar({
       <UnsplashSheet
         isOpen={isUnsplashOpen}
         onOpenChange={setIsUnsplashOpen}
-        findNonOverlappingPosition={findNonOverlappingPosition}
         setNodesToFocus={setNodesToFocus}
       />
     </>

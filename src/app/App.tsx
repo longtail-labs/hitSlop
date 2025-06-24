@@ -35,6 +35,7 @@ import { GitHubIcon } from './components/ui/github-icon';
 import { EXTERNAL_LINKS } from './config/links';
 import { createNodeId, createImageNode } from './lib/utils';
 import { useIsMobile, usePersistedFlow } from './lib/hooks';
+import { useNodePlacement } from './lib/useNodePlacement';
 
 // Import annotation node components
 import {
@@ -61,12 +62,6 @@ import { MobileView } from './components/mobile-view';
 //   }
 // `;
 // document.head.appendChild(globalStyle);
-
-// Define standard node dimensions for collision detection
-const NODE_DIMENSIONS = {
-  'prompt-node': { width: 300, height: 250 },
-  'image-node': { width: 300, height: 300 },
-};
 
 // Create an annotation node component
 function InstructionAnnotation() {
@@ -115,8 +110,8 @@ function Flow() {
     isLoaded,
   } = usePersistedFlow(instructionalNodes as AppNode[], initialEdges);
 
-  const { screenToFlowPosition, getIntersectingNodes, fitView } =
-    useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { findNonOverlappingPosition } = useNodePlacement();
   const [, setIsDragOver] = useState(false);
   const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
   const [nodesToFocus, setNodesToFocus] = useState<string | null>(null);
@@ -181,56 +176,6 @@ function Flow() {
     loadTutorialPreference();
   }, [isLoaded]);
 
-  // Find a non-overlapping position for a new node
-  const findNonOverlappingPosition = useCallback(
-    (initialPosition: { x: number; y: number }, nodeType: string) => {
-      'use memo';
-      const dimensions = NODE_DIMENSIONS[
-        nodeType as keyof typeof NODE_DIMENSIONS
-      ] || { width: 200, height: 200 };
-
-      let position = { ...initialPosition };
-      let tempNode: Node = {
-        id: 'temp',
-        type: nodeType,
-        position,
-        data: {},
-        width: dimensions.width,
-        height: dimensions.height,
-      };
-
-      // Check if the position causes overlap
-      let intersections = getIntersectingNodes(tempNode);
-
-      // If there are intersections, try to find a better position
-      if (intersections.length > 0) {
-        // Try different positions in a spiral pattern
-        const spiralStep = 100;
-        let attempts = 0;
-        let angle = 0;
-        let radius = spiralStep;
-
-        while (intersections.length > 0 && attempts < 50) {
-          // Move in a spiral pattern
-          angle += 0.5;
-          radius = spiralStep * (1 + angle / 10);
-
-          position = {
-            x: initialPosition.x + radius * Math.cos(angle),
-            y: initialPosition.y + radius * Math.sin(angle),
-          };
-
-          tempNode = { ...tempNode, position };
-          intersections = getIntersectingNodes(tempNode);
-          attempts++;
-        }
-      }
-
-      return position;
-    },
-    [getIntersectingNodes],
-  );
-
   const onConnect: OnConnect = useCallback(
     (connection) => {
       'use memo';
@@ -261,9 +206,9 @@ function Flow() {
           // Node has been initialized with dimensions, now we can focus on it
           fitView({
             nodes: [{ id: nodesToFocus }],
-            duration: 500,
-            padding: 1.8,
-            maxZoom: 0.8,
+            duration: 800,
+            padding: 0.2,
+            maxZoom: 1,
           });
 
           // Reset the focus target
@@ -277,7 +222,19 @@ function Flow() {
   const onPaneDoubleClick = useCallback(
     (event: React.MouseEvent) => {
       'use memo';
+
+      // Check if the event originated from a node (to prevent conflicts)
+      const target = event.target as HTMLElement;
+      if (target.closest('.react-flow__node')) {
+        console.log(
+          'Double-click originated from a node, ignoring pane double-click',
+        );
+        return;
+      }
+
       if (reactFlowWrapper.current) {
+        console.log('Pane double-click triggered');
+
         // Get the position where the user double-clicked
         const reactFlowBounds =
           reactFlowWrapper.current.getBoundingClientRect();
@@ -294,6 +251,8 @@ function Flow() {
 
         // Generate a unique ID using nanoid
         const newNodeId = createNodeId('prompt-node');
+
+        console.log('Creating new prompt node from pane double-click');
 
         // Create a new node at the non-overlapping position
         const newNode: AppNode = {
@@ -329,7 +288,7 @@ function Flow() {
         y:
           imageNodes.reduce((sum, node) => sum + node.position.y, 0) /
             imageNodes.length -
-          200, // Place it above
+          300, // Place it above
       };
 
       // Find a non-overlapping position based on the average position
@@ -456,7 +415,7 @@ function Flow() {
       });
 
       // Create image nodes for each dropped file
-      imageFiles.forEach((file, index) => {
+      imageFiles.forEach((file) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
           const imageDataUrl = e.target?.result as string;
@@ -465,8 +424,8 @@ function Flow() {
           // Calculate position with offset for multiple files
           const position = findNonOverlappingPosition(
             {
-              x: dropPosition.x + index * 50,
-              y: dropPosition.y + index * 50,
+              x: dropPosition.x, // Start at same x
+              y: dropPosition.y, // Start at same y
             },
             'image-node',
           );
@@ -699,14 +658,8 @@ function Flow() {
           </div>
         </Panel>
       </ReactFlow>
-      <FloatingToolbar
-        findNonOverlappingPosition={findNonOverlappingPosition}
-        setNodesToFocus={setNodesToFocus}
-      />
-      <FloatingSidebar
-        findNonOverlappingPosition={findNonOverlappingPosition}
-        setNodesToFocus={setNodesToFocus}
-      />
+      <FloatingToolbar setNodesToFocus={setNodesToFocus} />
+      <FloatingSidebar setNodesToFocus={setNodesToFocus} />
       {showTutorialBox && (
         <TutorialBox
           onDismiss={handleTutorialDismiss}

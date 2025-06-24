@@ -19,20 +19,15 @@ import {
 import { imageService } from '@/app/services/database';
 import { createNodeId, createEdgeId, createImageNode } from '@/app/lib/utils';
 import { ImageNodeToolbar } from '@/app/components/image-node-toolbar';
+import { useNodePlacement } from '@/app/lib/useNodePlacement';
 
 // Import the ImageNodeData type from types
 import { ImageNodeData } from './types';
 
 export function ImageNode({ data, selected, id }: NodeProps) {
   const nodeData = data as unknown as ImageNodeData;
-  const {
-    addNodes,
-    addEdges,
-    getNode,
-    getIntersectingNodes,
-    fitView,
-    setNodes,
-  } = useReactFlow();
+  const { addNodes, addEdges, getNode, fitView, setNodes } = useReactFlow();
+  const { findNonOverlappingPosition } = useNodePlacement();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
@@ -112,54 +107,19 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     }
   }, [currentImageUrl, nodeData]);
 
-  const findNonOverlappingPosition = useCallback(
-    (
-      initialPosition: { x: number; y: number },
-      dimensions = { width: 300, height: 250 },
-    ) => {
-      let position = { ...initialPosition };
-      let tempNode = {
-        id: 'temp',
-        position,
-        width: dimensions.width,
-        height: dimensions.height,
-      };
-      let intersections = getIntersectingNodes(tempNode);
-
-      if (intersections.length > 0) {
-        const spiralStep = 100;
-        let attempts = 0;
-        let angle = 0;
-        let radius = spiralStep;
-
-        while (intersections.length > 0 && attempts < 50) {
-          angle += 0.5;
-          radius = spiralStep * (1 + angle / 10);
-          position = {
-            x: initialPosition.x + radius * Math.cos(angle),
-            y: initialPosition.y + radius * Math.sin(angle),
-          };
-          tempNode = { ...tempNode, position };
-          intersections = getIntersectingNodes(tempNode);
-          attempts++;
-        }
-      }
-
-      return position;
-    },
-    [getIntersectingNodes],
-  );
-
   const handleDuplicate = useCallback(() => {
     if (!nodeData.imageId) return;
 
     const currentNode = getNode(id);
     if (!currentNode) return;
 
-    const newPosition = findNonOverlappingPosition({
-      x: currentNode.position.x + 350,
-      y: currentNode.position.y,
-    });
+    const newPosition = findNonOverlappingPosition(
+      {
+        x: currentNode.position.x + 350,
+        y: currentNode.position.y,
+      },
+      'image-node',
+    );
 
     const options: any = {
       source: nodeData.source,
@@ -194,28 +154,56 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setTimeout(() => {
       fitView({
         nodes: [{ id: newNode.id }],
-        duration: 500,
-        padding: 1.8,
-        maxZoom: 0.8,
+        duration: 800,
+        padding: 0.2,
+        maxZoom: 1,
       });
     }, 100);
   }, [id, nodeData, addNodes, getNode, findNonOverlappingPosition, fitView]);
 
   const handleEdit = useCallback(
     (event: React.MouseEvent) => {
+      event.preventDefault();
       event.stopPropagation();
-      if (!nodeData.imageId) return;
+
+      console.log('handleEdit called for node:', id);
+      console.log('nodeData:', nodeData);
+      console.log('nodeData.imageId:', nodeData.imageId);
+
+      // Enhanced validation with better error reporting
+      if (!nodeData) {
+        console.warn('No nodeData available for handleEdit on node:', id);
+        return;
+      }
+
+      if (!nodeData.imageId) {
+        console.warn(
+          'No imageId available for handleEdit on node:',
+          id,
+          'nodeData:',
+          nodeData,
+        );
+        return;
+      }
 
       const currentNode = getNode(id);
-      if (!currentNode) return;
+      if (!currentNode) {
+        console.warn('Current node not found for handleEdit:', id);
+        return;
+      }
 
       const initialPosition = {
         x: currentNode.position.x,
         y: currentNode.position.y + 350,
       };
 
-      const newPosition = findNonOverlappingPosition(initialPosition);
+      const newPosition = findNonOverlappingPosition(
+        initialPosition,
+        'prompt-node',
+      );
       const newNodeId = createNodeId('prompt-node');
+
+      console.log('Creating new prompt node with imageId:', nodeData.imageId);
 
       const newNode = {
         id: newNodeId,
@@ -242,15 +230,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       setTimeout(() => {
         fitView({
           nodes: [{ id: newNodeId }],
-          duration: 500,
-          padding: 1.8,
-          maxZoom: 0.8,
+          duration: 800,
+          padding: 0.2,
+          maxZoom: 1,
         });
       }, 100);
     },
     [
       id,
-      nodeData.imageId,
+      nodeData,
       addNodes,
       addEdges,
       getNode,
@@ -359,11 +347,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               )}
             </div>
           ) : currentImageUrl ? (
-            <div onDoubleClick={handleEdit} className="cursor-pointer">
+            <div className={nodeData.imageId ? 'cursor-pointer' : ''}>
               <img
                 src={currentImageUrl}
                 alt="AI generated image"
                 className="max-w-full rounded"
+                onDoubleClick={nodeData.imageId ? handleEdit : undefined}
               />
               {(nodeData.source === 'generated' ||
                 nodeData.source === 'edited') &&

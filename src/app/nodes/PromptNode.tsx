@@ -18,22 +18,14 @@ import {
 import { ImageIcon, Upload, X } from 'lucide-react';
 import { ModelParameterControls } from '@/app/components/ModelParameterControls';
 import { imageService } from '@/app/services/database';
-import {
-  createNodeId,
-  createEdgeId,
-  createLoadingImageNode,
-} from '@/app/lib/utils';
+import { createEdgeId, createLoadingImageNode } from '@/app/lib/utils';
+import { useNodePlacement } from '@/app/lib/useNodePlacement';
 
 export function PromptNode({ data, id, selected }: NodeProps) {
   const reactFlowInstance = useReactFlow();
-  const {
-    addNodes,
-    addEdges,
-    setNodes,
-    getNode,
-    getIntersectingNodes,
-    fitView,
-  } = reactFlowInstance;
+  const { addNodes, addEdges, setNodes, getNode, fitView } = reactFlowInstance;
+  const { findNonOverlappingPosition, findPositionsForMultipleNodes } =
+    useNodePlacement();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,9 +34,16 @@ export function PromptNode({ data, id, selected }: NodeProps) {
   const [model, setModel] = useState<ModelId>(
     (data?.model as ModelId) || 'gpt-image-1',
   );
-  const [sourceImages, setSourceImages] = useState<string[]>(
-    (data?.sourceImages as string[]) || [],
-  );
+  const [sourceImages, setSourceImages] = useState<string[]>(() => {
+    const images = (data?.sourceImages as string[]) || [];
+    console.log(
+      'PromptNode initialized with sourceImages:',
+      images,
+      'for node:',
+      id,
+    );
+    return images;
+  });
   const [error, setError] = useState<string | null>(null);
 
   // State for displaying source images (resolved to data URLs for rendering)
@@ -70,6 +69,13 @@ export function PromptNode({ data, id, selected }: NodeProps) {
 
   // Resolve source images to display URLs when sourceImages changes
   useEffect(() => {
+    console.log(
+      'PromptNode sourceImages changed:',
+      sourceImages,
+      'for node:',
+      id,
+    );
+
     const resolveDisplayImages = async () => {
       const resolvedUrls: string[] = [];
 
@@ -79,6 +85,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           const imageUrl = await imageService.getImage(imageId);
           if (imageUrl) {
             resolvedUrls.push(imageUrl);
+            console.log(`Successfully resolved image ID ${imageId} to URL`);
           } else {
             console.warn(`Image ID ${imageId} not found in storage`);
           }
@@ -87,6 +94,11 @@ export function PromptNode({ data, id, selected }: NodeProps) {
         }
       }
 
+      console.log(
+        'Setting displayImageUrls to:',
+        resolvedUrls.length,
+        'images',
+      );
       setDisplayImageUrls(resolvedUrls);
     };
 
@@ -95,55 +107,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     } else {
       setDisplayImageUrls([]);
     }
-  }, [sourceImages]);
-
-  const findNonOverlappingPosition = useCallback(
-    (basePosition: { x: number; y: number }, index: number) => {
-      'use memo';
-      const offset = index * 50; // Offset each image by 50px
-      let position = {
-        x: basePosition.x + offset,
-        y: basePosition.y,
-      };
-
-      let tempNode = {
-        id: 'temp',
-        position,
-        width: 300,
-        height: 300,
-      };
-
-      // Check if the position causes overlap
-      let intersections = getIntersectingNodes(tempNode);
-
-      // If there are intersections, try to find a better position
-      if (intersections.length > 0) {
-        // Try different positions in a spiral pattern
-        const spiralStep = 100;
-        let attempts = 0;
-        let angle = 0;
-        let radius = spiralStep;
-
-        while (intersections.length > 0 && attempts < 50) {
-          // Move in a spiral pattern
-          angle += 0.5;
-          radius = spiralStep * (1 + angle / 10);
-
-          position = {
-            x: basePosition.x + radius * Math.cos(angle),
-            y: basePosition.y + radius * Math.sin(angle),
-          };
-
-          tempNode = { ...tempNode, position };
-          intersections = getIntersectingNodes(tempNode);
-          attempts++;
-        }
-      }
-
-      return position;
-    },
-    [getIntersectingNodes],
-  );
+  }, [sourceImages, id]);
 
   const handlePromptChange = useCallback(
     (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -230,32 +194,35 @@ export function PromptNode({ data, id, selected }: NodeProps) {
       const numImages = modelParams.n || 1;
       const newNodeIds: string[] = [];
 
+      // Get positions for all nodes at once to ensure proper spacing
+      const positions = findPositionsForMultipleNodes(
+        basePosition,
+        'image-node',
+        numImages,
+      );
+
       for (let i = 0; i < numImages; i++) {
-        const imageNodeId = createNodeId('image-node');
-        newNodeIds.push(imageNodeId);
-
-        const nonOverlappingPosition = findNonOverlappingPosition(
-          basePosition,
-          i,
-        );
-
         const loadingImageNode: AppNode = createLoadingImageNode(
-          nonOverlappingPosition,
+          positions[i],
           prompt,
         );
 
+        // Use the actual node ID generated by createLoadingImageNode
+        newNodeIds.push(loadingImageNode.id);
         loadingImageNodes.push(loadingImageNode);
         addNodes(loadingImageNode);
 
-        const edgeId = createEdgeId(id, imageNodeId);
+        const edgeId = createEdgeId(id, loadingImageNode.id);
         addEdges({
           id: edgeId,
           source: id,
-          target: imageNodeId,
+          target: loadingImageNode.id,
           sourceHandle: 'output',
           targetHandle: 'input',
         });
       }
+
+      // Don't focus immediately - wait for generation to complete
 
       const params = {
         prompt,
@@ -307,13 +274,16 @@ export function PromptNode({ data, id, selected }: NodeProps) {
           }),
         );
 
+        // Focus on the generated images after they're ready
         if (newNodeIds.length > 0) {
-          fitView({
-            nodes: [{ id: newNodeIds[0] }],
-            duration: 500,
-            padding: 1.8,
-            maxZoom: 0.8,
-          });
+          setTimeout(() => {
+            fitView({
+              nodes: newNodeIds.map((id) => ({ id })),
+              duration: 800,
+              padding: 0.3,
+              maxZoom: 0.8,
+            });
+          }, 500); // Give a moment for the images to render
         }
       } else if (result.error) {
         setNodes((nodes) =>
@@ -354,6 +324,7 @@ export function PromptNode({ data, id, selected }: NodeProps) {
     getNode,
     id,
     findNonOverlappingPosition,
+    findPositionsForMultipleNodes,
     fitView,
   ]);
 

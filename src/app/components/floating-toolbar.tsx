@@ -1,5 +1,5 @@
 import { useReactFlow } from '@xyflow/react';
-import { Image, Video, AudioWaveform } from 'lucide-react';
+import { Image, Video, AudioWaveform, Type } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
   Popover,
@@ -8,20 +8,15 @@ import {
 } from '@/app/components/ui/popover';
 import { AppNode } from '@/app/nodes/types';
 import { createNodeId } from '@/app/lib/utils';
+import { useNodePlacement } from '@/app/lib/useNodePlacement';
 
 interface FloatingToolbarProps {
-  findNonOverlappingPosition: (
-    _initialPosition: { x: number; y: number },
-    _nodeType: string,
-  ) => { x: number; y: number };
   setNodesToFocus: (_nodeId: string | null) => void;
 }
 
-export function FloatingToolbar({
-  findNonOverlappingPosition,
-  setNodesToFocus,
-}: FloatingToolbarProps) {
+export function FloatingToolbar({ setNodesToFocus }: FloatingToolbarProps) {
   const { setNodes, screenToFlowPosition } = useReactFlow();
+  const { findNonOverlappingPosition } = useNodePlacement();
 
   const handleAddImageNode = () => {
     // Get the center of the current viewport
@@ -74,6 +69,43 @@ export function FloatingToolbar({
             <Image size={18} />
             <span className="text-sm font-medium">Image</span>
           </Button>
+
+          {/* Text Button with Coming Soon Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-accent cursor-default opacity-60 font-recursive"
+                style={{
+                  fontVariationSettings: '"MONO" 0.6, "wght" 500, "CASL" 0.4',
+                }}
+              >
+                <Type size={18} />
+                <span className="text-sm font-medium">Text</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-3" side="top">
+              <div className="text-center">
+                <div
+                  className="text-sm font-medium mb-1 font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.5, "wght" 600, "CASL" 0.3',
+                  }}
+                >
+                  Coming Soon
+                </div>
+                <div
+                  className="text-xs text-muted-foreground font-recursive"
+                  style={{
+                    fontVariationSettings: '"MONO" 0.3, "wght" 400, "CASL" 0.7',
+                  }}
+                >
+                  Text generation will be available in a future update
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* Video Button with Coming Soon Popover */}
           <Popover>
