@@ -76,19 +76,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       const link = document.createElement('a');
       link.href = url;
 
-      // Attempt to create a more descriptive filename
+      // Use image ID for filename
       const getFilename = () => {
-        if (nodeData.source === 'unsplash' && nodeData.alt) {
-          return `${nodeData.alt
-            .toLowerCase()
-            .replace(/\s+/g, '-')
-            .substring(0, 50)}.png`;
-        }
-        if (nodeData.prompt) {
-          return `${String(nodeData.prompt)
-            .toLowerCase()
-            .replace(/\s+/g, '-')
-            .substring(0, 50)}.png`;
+        if (nodeData.imageId) {
+          return `${nodeData.imageId}.png`;
         }
         return `image-${Date.now()}.png`;
       };
