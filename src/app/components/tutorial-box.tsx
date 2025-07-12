@@ -1,12 +1,16 @@
 import { X, Play } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
+import { EXTERNAL_LINKS } from '@/app/config/links';
 
 interface TutorialBoxProps {
   onDismiss: () => void;
-  onPlayClick: () => void;
 }
 
-export function TutorialBox({ onDismiss, onPlayClick }: TutorialBoxProps) {
+export function TutorialBox({ onDismiss }: TutorialBoxProps) {
+  const openTutorial = () => {
+    window.open(EXTERNAL_LINKS.tutorial, '_blank');
+  };
+
   return (
     <div className="fixed bottom-4 right-4 w-80 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
       {/* Close button */}
@@ -21,7 +25,7 @@ export function TutorialBox({ onDismiss, onPlayClick }: TutorialBoxProps) {
       {/* Image with play button overlay */}
       <div
         className="relative bg-gray-100 h-48 flex items-center justify-center cursor-pointer"
-        onClick={onPlayClick}
+        onClick={openTutorial}
       >
         {/* Placeholder for tutorial image - you can replace with actual image */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-600 opacity-20"></div>
@@ -46,7 +50,7 @@ export function TutorialBox({ onDismiss, onPlayClick }: TutorialBoxProps) {
           Watch a quick tutorial to learn how to create and edit images with
           hitSlop
         </p>
-        <Button onClick={onPlayClick} className="w-full" size="sm">
+        <Button onClick={openTutorial} className="w-full" size="sm">
           <Play className="h-4 w-4 mr-2" />
           Watch Tutorial
         </Button>

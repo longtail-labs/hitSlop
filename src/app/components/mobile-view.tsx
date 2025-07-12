@@ -2,11 +2,12 @@ import { Play } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { EXTERNAL_LINKS } from '@/app/config/links';
 
-interface MobileViewProps {
-  onPlayClick: () => void;
-}
 
-export function MobileView({ onPlayClick }: MobileViewProps) {
+export function MobileView() {
+  const openTutorial = () => {
+    window.open(EXTERNAL_LINKS.tutorial, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
       {/* Logo and Title Section */}
@@ -57,7 +58,7 @@ export function MobileView({ onPlayClick }: MobileViewProps) {
       <div className="w-full max-w-sm mb-8">
         <div
           className="relative bg-gray-100 h-48 flex items-center justify-center cursor-pointer rounded-lg overflow-hidden shadow-md"
-          onClick={onPlayClick}
+          onClick={openTutorial}
         >
           {/* Background gradient */}
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-600 opacity-20"></div>
@@ -81,7 +82,7 @@ export function MobileView({ onPlayClick }: MobileViewProps) {
             Watch a quick tutorial to learn how to create and edit images with
             hitSlop
           </p>
-          <Button onClick={onPlayClick} className="w-full" size="sm">
+          <Button onClick={openTutorial} className="w-full" size="sm">
             <Play className="h-4 w-4 mr-2" />
             Watch Tutorial
           </Button>

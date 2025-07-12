@@ -469,12 +469,6 @@ function Flow() {
       setShowTutorialBox(false);
     }
   }, []);
-
-  const handleTutorialPlay = useCallback(() => {
-    // Open tutorial link - replace with your actual tutorial URL
-    window.open('https://your-tutorial-link.com', '_blank');
-  }, []);
-
   // Add clear all function
   const clearAllData = useCallback(async () => {
     const confirmed = window.confirm(
@@ -660,12 +654,7 @@ function Flow() {
       </ReactFlow>
       <FloatingToolbar setNodesToFocus={setNodesToFocus} />
       <FloatingSidebar setNodesToFocus={setNodesToFocus} />
-      {showTutorialBox && (
-        <TutorialBox
-          onDismiss={handleTutorialDismiss}
-          onPlayClick={handleTutorialPlay}
-        />
-      )}
+      {showTutorialBox && <TutorialBox onDismiss={handleTutorialDismiss} />}
     </div>
   );
 }
@@ -673,15 +662,9 @@ function Flow() {
 export default function App() {
   const isMobile = useIsMobile();
 
-  // Handle tutorial play action
-  const handleTutorialPlay = useCallback(() => {
-    // Open tutorial link - replace with your actual tutorial URL
-    window.open('https://your-tutorial-link.com', '_blank');
-  }, []);
-
   // Render mobile view if on mobile device
   if (isMobile) {
-    return <MobileView onPlayClick={handleTutorialPlay} />;
+    return <MobileView />;
   }
 
   return (
