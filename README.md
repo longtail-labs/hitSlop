@@ -7,8 +7,12 @@
 Plain text. Complete context. Zero lock-in.
 
 <div align="center">
-<img src="examples/hitslop-hero.png" width="700" alt="hitSlop in action">
+<table><tr>
+<td><img src="examples/hitslop-hero.png" width="480" alt="hitSlop in action"></td>
+<td><img src="examples/flashcard-code.png" width="280" alt="The .slop file behind it"></td>
+</tr></table>
 </div>
+
 ---
 
 ## The Problem
@@ -116,9 +120,6 @@ Your AI reads this. You read this. Any tool reads this.
 # Clone repository
 git clone https://github.com/longtail-labs/hitSlop.git
 cd hitslop
-
-# Initialize submodules
-git submodule update --init --recursive
 
 # Open in Xcode
 open hitSlop/hitSlop.xcodeproj
@@ -344,19 +345,6 @@ Create custom themes at runtime. Drop a `.theme` file in `~/.hitslop/themes/`:
   }
 }
 ```
-
----
-
-## Contributing
-
-Contributions welcome.
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-**Code style:** Swift conventions, composition over inheritance, explain "why" not "what".
 
 ---
 
