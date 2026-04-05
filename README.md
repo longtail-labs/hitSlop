@@ -2,7 +2,7 @@
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2?logo=discord&logoColor=white)](https://discord.gg/cqKRZjAWv3)
 
-**Documents your AI can read, edit, and understand — and so can you.**
+**Interactive documents your AI can read, edit, and understand — and so can you.**
 
 Plain text. Complete context. Zero lock-in.
 
@@ -92,7 +92,7 @@ Three pieces, all plain text, all yours:
 
 **Themes** — 22 built-in visual styles, or create your own at runtime. Dark, light, vibrant, minimal — each with semantic colors, typography, and spacing.
 
-**Documents** — `.slop` packages containing `slop.json` with your template reference, data, and preferences. Assets like images live alongside. Everything together, everything portable.
+**Documents** — Interactive `.slop` packages containing `slop.json` with your template reference, data, and preferences. Assets like images live alongside. Everything together, everything portable.
 
 ```json
 {
@@ -376,4 +376,4 @@ MIT
 
 ---
 
-**Your AI can edit your document while you watch. You can edit your document while your AI watches. Same file. Same truth.**
+**Your AI can edit your interactive document while you watch. You can edit it while your AI watches. Same file. Same truth.**
