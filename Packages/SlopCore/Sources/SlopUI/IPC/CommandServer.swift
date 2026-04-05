@@ -131,12 +131,16 @@ public final class CommandServer {
 
         // Dispatch to handler on main actor.
         // The semaphore serializes access so there is no data race.
+        final class ResponseBox: @unchecked Sendable {
+            var value: JSONRPCResponse?
+        }
+
         let semaphore = DispatchSemaphore(value: 0)
-        nonisolated(unsafe) var response: JSONRPCResponse?
+        let box = ResponseBox()
 
         DispatchQueue.main.async { [weak self] in
             guard let self else {
-                response = JSONRPCResponse(
+                box.value = JSONRPCResponse(
                     id: request.id,
                     error: .internalError("Server shutting down")
                 )
@@ -146,9 +150,9 @@ public final class CommandServer {
 
             Task { @MainActor in
                 if let handler = self.handler {
-                    response = await handler(request)
+                    box.value = await handler(request)
                 } else {
-                    response = JSONRPCResponse(
+                    box.value = JSONRPCResponse(
                         id: request.id,
                         error: .internalError("No handler registered")
                     )
@@ -159,7 +163,7 @@ public final class CommandServer {
 
         semaphore.wait()
 
-        guard let resp = response, let data = try? IPCTransport.encode(resp) else { return }
+        guard let resp = box.value, let data = try? IPCTransport.encode(resp) else { return }
         _ = data.withUnsafeBytes { buf in
             Darwin.send(fd, buf.baseAddress!, buf.count, 0)
         }
