@@ -4,7 +4,7 @@
 
 **Interactive documents your AI can read, edit, and understand — and so can you.**
 
-Plain text. Complete context. Zero lock-in.
+Plain text. Complete context. Zero lock-in
 
 <div align="center">
 <table><tr>
