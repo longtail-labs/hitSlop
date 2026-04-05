@@ -1,0 +1,21 @@
+{
+  "displayName": "Midnight Ink",
+  "group": "Dark",
+  "background": "#0c0c14",
+  "foreground": "#e4e4f0",
+  "secondary": "#6c6c8a",
+  "accent": "#7c7cf0",
+  "surface": "#16162a",
+  "divider": "#28283e",
+  "success": "#47d87a",
+  "warning": "#f0b840",
+  "error": "#f05050",
+  "muted": "#555570",
+  "border": "#323248",
+  "titleFontFamily": "Baskerville",
+  "bodyFontFamily": "Georgia",
+  "monoFontFamily": "SF Mono",
+  "titleWeight": "semibold",
+  "bodyWeight": "regular",
+  "cornerRadius": 16
+}

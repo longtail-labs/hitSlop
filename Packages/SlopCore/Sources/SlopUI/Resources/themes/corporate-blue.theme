@@ -1,0 +1,21 @@
+{
+  "displayName": "Corporate Blue",
+  "group": "Professional",
+  "background": "#f5f7fa",
+  "foreground": "#1a2332",
+  "secondary": "#64748b",
+  "accent": "#2563eb",
+  "surface": "#ebeef3",
+  "divider": "#d1d5db",
+  "success": "#16a34a",
+  "warning": "#d97706",
+  "error": "#dc2626",
+  "muted": "#94a3b8",
+  "border": "#c0c8d4",
+  "titleFontFamily": "SF Pro Display",
+  "bodyFontFamily": "SF Pro Text",
+  "monoFontFamily": "SF Mono",
+  "titleWeight": "semibold",
+  "bodyWeight": "regular",
+  "cornerRadius": 10
+}

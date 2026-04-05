@@ -1,0 +1,21 @@
+{
+  "displayName": "Ember Glow",
+  "group": "Warm",
+  "background": "#1a0e08",
+  "foreground": "#ffe8d0",
+  "secondary": "#b08060",
+  "accent": "#ff6a1a",
+  "surface": "#2a1810",
+  "divider": "#4a2c1a",
+  "success": "#5fba60",
+  "warning": "#ffb833",
+  "error": "#ff4444",
+  "muted": "#8a6048",
+  "border": "#5c3828",
+  "titleFontFamily": "Georgia",
+  "bodyFontFamily": "Georgia",
+  "monoFontFamily": "Monaco",
+  "titleWeight": "bold",
+  "bodyWeight": "regular",
+  "cornerRadius": 14
+}

@@ -1,0 +1,24 @@
+{
+  "id": "user.counter",
+  "name": "Counter",
+  "version": "1.0.0",
+  "minimumHostVersion": "1.0.0",
+  "scriptFile": "script.lua",
+  "metadata": {
+    "width": 260,
+    "height": 320,
+    "windowShape": { "type": "roundedRect", "value": 20 },
+    "alwaysOnTop": true,
+    "titleBarHidden": true
+  },
+  "schema": {
+    "sections": [{
+      "title": "Counter",
+      "fields": [
+        { "key": "title", "label": "Title", "kind": "string", "required": true, "defaultValue": { "type": "string", "value": "My Counter" }, "constraints": [] },
+        { "key": "count", "label": "Count", "kind": "number", "required": true, "defaultValue": { "type": "number", "value": 0 }, "constraints": [] },
+        { "key": "step",  "label": "Step",  "kind": "number", "required": true, "defaultValue": { "type": "number", "value": 1 }, "constraints": [] }
+      ]
+    }]
+  }
+}

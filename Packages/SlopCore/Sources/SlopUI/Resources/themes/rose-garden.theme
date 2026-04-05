@@ -1,0 +1,21 @@
+{
+  "displayName": "Rose Garden",
+  "group": "Warm",
+  "background": "#1a0d14",
+  "foreground": "#f8e8f0",
+  "secondary": "#b07888",
+  "accent": "#e8608a",
+  "surface": "#2a1420",
+  "divider": "#4a2838",
+  "success": "#4fbe6c",
+  "warning": "#e8a840",
+  "error": "#e84060",
+  "muted": "#886070",
+  "border": "#583040",
+  "titleFontFamily": "Didot",
+  "bodyFontFamily": "Iowan Old Style",
+  "monoFontFamily": "SF Mono",
+  "titleWeight": "bold",
+  "bodyWeight": "regular",
+  "cornerRadius": 16
+}

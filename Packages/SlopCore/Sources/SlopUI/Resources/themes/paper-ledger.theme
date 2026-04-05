@@ -1,0 +1,16 @@
+{
+  "displayName": "Paper Ledger",
+  "group": "Light",
+  "background": "#f4efe7",
+  "foreground": "#271f18",
+  "secondary": "#74655b",
+  "accent": "#bf6c3d",
+  "surface": "#ebe2d4",
+  "divider": "#d7cab8",
+  "titleFontFamily": "Iowan Old Style",
+  "bodyFontFamily": "Charter",
+  "monoFontFamily": "Courier New",
+  "titleWeight": "semibold",
+  "bodyWeight": "regular",
+  "cornerRadius": 14
+}

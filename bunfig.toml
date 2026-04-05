@@ -1,0 +1,5 @@
+[install]
+cache = "node_modules/.cache/bun"
+
+[run]
+shell = "bash"

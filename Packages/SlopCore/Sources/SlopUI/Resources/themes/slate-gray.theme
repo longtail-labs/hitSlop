@@ -1,0 +1,21 @@
+{
+  "displayName": "Slate Gray",
+  "group": "Minimal",
+  "background": "#f1f3f5",
+  "foreground": "#212529",
+  "secondary": "#6c757d",
+  "accent": "#495057",
+  "surface": "#e9ecef",
+  "divider": "#ced4da",
+  "success": "#40c057",
+  "warning": "#fd7e14",
+  "error": "#fa5252",
+  "muted": "#868e96",
+  "border": "#c0c6cc",
+  "titleFontFamily": "SF Pro Display",
+  "bodyFontFamily": "SF Pro Text",
+  "monoFontFamily": "SF Mono",
+  "titleWeight": "semibold",
+  "bodyWeight": "regular",
+  "cornerRadius": 10
+}

@@ -1,0 +1,16 @@
+{
+  "displayName": "Sunset Poster",
+  "group": "Warm",
+  "background": "#2a1212",
+  "foreground": "#fff0e4",
+  "secondary": "#d6a797",
+  "accent": "#ff8b5b",
+  "surface": "#3b1a1b",
+  "divider": "#5b2e2d",
+  "titleFontFamily": "Gill Sans",
+  "bodyFontFamily": "Gill Sans",
+  "monoFontFamily": "Menlo",
+  "titleWeight": "bold",
+  "bodyWeight": "regular",
+  "cornerRadius": 20
+}

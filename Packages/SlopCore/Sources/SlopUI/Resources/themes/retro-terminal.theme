@@ -1,0 +1,21 @@
+{
+  "displayName": "Retro Terminal",
+  "group": "Retro",
+  "background": "#001100",
+  "foreground": "#33ff33",
+  "secondary": "#1a991a",
+  "accent": "#00ff00",
+  "surface": "#002200",
+  "divider": "#004400",
+  "success": "#33ff33",
+  "warning": "#ffff33",
+  "error": "#ff3333",
+  "muted": "#118811",
+  "border": "#006600",
+  "titleFontFamily": "Courier New",
+  "bodyFontFamily": "Courier New",
+  "monoFontFamily": "Courier New",
+  "titleWeight": "bold",
+  "bodyWeight": "regular",
+  "cornerRadius": 4
+}

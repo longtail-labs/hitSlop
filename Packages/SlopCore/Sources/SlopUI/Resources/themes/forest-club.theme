@@ -1,0 +1,16 @@
+{
+  "displayName": "Forest Club",
+  "group": "Nature",
+  "background": "#0d1710",
+  "foreground": "#e7f2e9",
+  "secondary": "#86a18a",
+  "accent": "#8ac36a",
+  "surface": "#18231b",
+  "divider": "#263427",
+  "titleFontFamily": "Optima",
+  "bodyFontFamily": "Palatino",
+  "monoFontFamily": "Monaco",
+  "titleWeight": "semibold",
+  "bodyWeight": "regular",
+  "cornerRadius": 18
+}

@@ -1,0 +1,16 @@
+{
+  "displayName": "Ocean Glass",
+  "group": "Cool",
+  "background": "#091722",
+  "foreground": "#e5f4fb",
+  "secondary": "#83a6b9",
+  "accent": "#5fc0e8",
+  "surface": "#102332",
+  "divider": "#1d3b4c",
+  "titleFontFamily": "Baskerville",
+  "bodyFontFamily": "Avenir Next",
+  "monoFontFamily": "Menlo",
+  "titleWeight": "semibold",
+  "bodyWeight": "regular",
+  "cornerRadius": 18
+}

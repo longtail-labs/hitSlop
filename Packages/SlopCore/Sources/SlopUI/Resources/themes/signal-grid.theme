@@ -1,0 +1,16 @@
+{
+  "displayName": "Signal Grid",
+  "group": "Dark",
+  "background": "#08131a",
+  "foreground": "#e6f6fb",
+  "secondary": "#6f8d97",
+  "accent": "#39c6d6",
+  "surface": "#102029",
+  "divider": "#1b3440",
+  "titleFontFamily": "Futura",
+  "bodyFontFamily": "SF Pro Text",
+  "monoFontFamily": "SF Mono",
+  "titleWeight": "bold",
+  "bodyWeight": "regular",
+  "cornerRadius": 16
+}

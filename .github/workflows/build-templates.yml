@@ -1,0 +1,118 @@
+name: Build Templates
+
+on:
+  push:
+    paths:
+      - 'Templates/**'
+      - 'Packages/SlopKit/**'
+  pull_request:
+    paths:
+      - 'Templates/**'
+      - 'Packages/SlopKit/**'
+  workflow_dispatch:
+
+concurrency:
+  group: templates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      templates: ${{ steps.find.outputs.templates }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          TEMPLATES=$(ls -d Templates/*/Package.swift | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "templates=$TEMPLATES" >> "$GITHUB_OUTPUT"
+
+  build-macros:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SlopMacros build
+        uses: actions/cache@v4
+        with:
+          path: |
+            Packages/SlopKit/.build
+            Templates/.spm-cache
+          key: slopmacros-${{ hashFiles('Packages/SlopKit/Sources/SlopMacros/**', 'Packages/SlopKit/Package.swift') }}
+          restore-keys: |
+            slopmacros-
+
+      - name: Build SlopMacros
+        run: ./Templates/build-macros.sh
+
+      - name: Upload prebuilt macros
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-macros
+          path: Templates/.macros/SlopMacros-tool
+          retention-days: 90
+
+  build-template:
+    needs: [discover, build-macros]
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJson(needs.discover.outputs.templates) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download prebuilt macros
+        uses: actions/download-artifact@v4
+        with:
+          name: prebuilt-macros
+          path: Templates/.macros
+
+      - name: Make macros executable
+        run: chmod +x Templates/.macros/SlopMacros-tool
+
+      - name: Cache SPM build
+        uses: actions/cache@v4
+        with:
+          path: |
+            Templates/${{ matrix.template }}/.build
+            Templates/.spm-cache
+          key: template-${{ matrix.template }}-${{ hashFiles(format('Templates/{0}/Sources/**', matrix.template), 'Packages/SlopKit/Sources/**') }}
+          restore-keys: |
+            template-${{ matrix.template }}-
+
+      - name: Build ${{ matrix.template }}
+        run: ./Templates/build-template.sh "Templates/${{ matrix.template }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: template-${{ matrix.template }}
+          path: Templates/build/${{ matrix.template }}/
+          retention-days: 90
+
+  package:
+    needs: build-template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all template artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-templates
+          pattern: template-*
+
+      - name: Package templates
+        run: |
+          mkdir -p combined
+          for dir in all-templates/template-*/; do
+            template_name="$(basename "$dir" | sed 's/^template-//')"
+            cp -R "$dir" "combined/$template_name"
+          done
+          tar -czf all-templates.tar.gz -C combined .
+
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-templates
+          path: all-templates.tar.gz
+          retention-days: 90

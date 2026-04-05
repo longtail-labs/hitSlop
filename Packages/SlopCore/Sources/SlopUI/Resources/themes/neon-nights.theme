@@ -1,0 +1,21 @@
+{
+  "displayName": "Neon Nights",
+  "group": "Vibrant",
+  "background": "#0a0015",
+  "foreground": "#f0e6ff",
+  "secondary": "#9b7ec8",
+  "accent": "#ff2daa",
+  "surface": "#140028",
+  "divider": "#2a1048",
+  "success": "#00ff88",
+  "warning": "#ffaa00",
+  "error": "#ff3366",
+  "muted": "#6b5588",
+  "border": "#3d2060",
+  "titleFontFamily": "Futura",
+  "bodyFontFamily": "Futura",
+  "monoFontFamily": "Menlo",
+  "titleWeight": "heavy",
+  "bodyWeight": "medium",
+  "cornerRadius": 14
+}

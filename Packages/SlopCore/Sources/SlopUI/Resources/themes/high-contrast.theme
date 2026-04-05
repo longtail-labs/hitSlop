@@ -1,0 +1,21 @@
+{
+  "displayName": "High Contrast",
+  "group": "Accessibility",
+  "background": "#000000",
+  "foreground": "#ffffff",
+  "secondary": "#cccccc",
+  "accent": "#ffff00",
+  "surface": "#1a1a1a",
+  "divider": "#666666",
+  "success": "#00ff00",
+  "warning": "#ffff00",
+  "error": "#ff0000",
+  "muted": "#999999",
+  "border": "#888888",
+  "titleFontFamily": "SF Pro Display",
+  "bodyFontFamily": "SF Pro Text",
+  "monoFontFamily": "Menlo",
+  "titleWeight": "bold",
+  "bodyWeight": "medium",
+  "cornerRadius": 8
+}

@@ -1,0 +1,16 @@
+{
+  "displayName": "Playroom",
+  "group": "Playful",
+  "background": "#fff1db",
+  "foreground": "#2a2033",
+  "secondary": "#7e6b84",
+  "accent": "#ff7f50",
+  "surface": "#ffe0c7",
+  "divider": "#f2c6a6",
+  "titleFontFamily": "Avenir Next Rounded",
+  "bodyFontFamily": "Avenir Next",
+  "monoFontFamily": "Menlo",
+  "titleWeight": "heavy",
+  "bodyWeight": "medium",
+  "cornerRadius": 22
+}
