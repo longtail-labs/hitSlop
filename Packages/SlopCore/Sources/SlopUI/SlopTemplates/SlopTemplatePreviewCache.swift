@@ -99,7 +99,7 @@ public final class SlopTemplatePreviewCache {
             let metadata: TemplateMetadata
 
             if let builtInType = entry.builtInType {
-                resolvedBundleURL = BuiltInTemplateRegistry.resourceBundle.bundleURL
+                resolvedBundleURL = entry.installURL
                 let defaults = builtInType.schema.defaultValues()
                 let store = RawTemplateStore(values: defaults, persist: { _ in })
                 let instance = builtInType.init(rawStore: store)

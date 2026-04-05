@@ -19,9 +19,6 @@ let package = Package(
                 .product(name: "SlopKit", package: "SlopKit"),
                 .product(name: "STTextView", package: "STTextView"),
                 .product(name: "SwiftCSV", package: "SwiftCSV"),
-            ],
-            resources: [
-                .process("Resources"),
             ]
         ),
         .testTarget(

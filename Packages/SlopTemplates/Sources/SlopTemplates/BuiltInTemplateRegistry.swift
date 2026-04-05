@@ -2,9 +2,6 @@ import Foundation
 import SlopKit
 
 public struct BuiltInTemplateRegistry {
-    /// The resource bundle for built-in template assets (skins, etc.).
-    public static let resourceBundle: Bundle = Bundle.module
-
     nonisolated(unsafe) public static let all: [any AnySlopTemplate.Type] = [
         AppStoreScreenshotView_SlopTemplate.self,
         BudgetView_SlopTemplate.self,

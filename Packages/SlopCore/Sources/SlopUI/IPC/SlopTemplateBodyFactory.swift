@@ -33,9 +33,6 @@ enum SlopTemplateBodyFactory {
 
     /// Resolved bundle URL for a given entry (used for skin/resource loading).
     static func bundleURL(for entry: SlopTemplateRegistry.Entry) -> URL {
-        if entry.isBuiltIn {
-            return BuiltInTemplateRegistry.resourceBundle.bundleURL
-        }
-        return entry.bundleURL ?? entry.installURL
+        entry.bundleURL ?? entry.installURL
     }
 }

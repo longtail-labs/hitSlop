@@ -70,9 +70,7 @@ public class SlopTemplateWindow: NSObject, HoverToolbarPanelDelegate, NSWindowDe
 
         // 3. Decode typed data using the resolved schema
         let slopFile = SlopFile(envelope: envelope, schema: entry.manifest.schema)
-        self.bundleURL = entry.isBuiltIn
-            ? BuiltInTemplateRegistry.resourceBundle.bundleURL
-            : entry.bundleURL
+        self.bundleURL = entry.bundleURL
         self.aiService = aiService
 
         // 4. Apply SlopFile overrides over template metadata
@@ -123,15 +121,9 @@ public class SlopTemplateWindow: NSObject, HoverToolbarPanelDelegate, NSWindowDe
         switch meta.windowShape {
         case .skin(let filename):
             // Try template bundle first, then SkinCatalog
-            let skinURL: URL?
-            if entry.isBuiltIn {
-                skinURL = BuiltInTemplateRegistry.resourceBundle.resourceURL?
-                    .appendingPathComponent(filename)
-            } else {
-                skinURL = entry.bundleURL?
-                    .appendingPathComponent("Contents/Resources")
-                    .appendingPathComponent(filename)
-            }
+            let skinURL: URL? = entry.bundleURL?
+                .appendingPathComponent("Contents/Resources")
+                .appendingPathComponent(filename)
             let resolvedURL = skinURL.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
                 ?? SkinCatalog.resolve(filename)?.fileURL
             if let resolvedURL, let skin = SkinLoader.load(from: resolvedURL) {
