@@ -45,9 +45,15 @@ ${files}
 
 Write a single-line commit message (no quotes, no prefix emoji). Be specific about what changed. If it's mostly version bump, just say "release v${newVersion}".`;
 
-  const ai = exec(`echo ${JSON.stringify(prompt)} | claude -p --max-turns 1`, { silent: true, timeout: 30_000 });
-  if (ai && ai.length > 5 && ai.length < 200) {
-    message = ai.split('\n')[0].trim();
+  const ai = execSync('claude -p', {
+    input: prompt,
+    encoding: 'utf-8',
+    timeout: 30_000,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }).toString().trim();
+  const line = ai.split('\n').pop()?.trim() ?? '';
+  if (line.length > 5 && line.length < 200 && !line.startsWith('Error')) {
+    message = line;
   }
 } catch {
   // timeout or claude not available — use fallback
