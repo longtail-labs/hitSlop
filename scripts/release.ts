@@ -43,7 +43,7 @@ ${diff}
 Files changed:
 ${files}
 
-Write a single-line commit message (no quotes, no prefix emoji). Be specific about what changed. If it's mostly version bump, just say "release v${newVersion}".`;
+Write a single-line commit message (no quotes, no prefix emoji). Be specific about what changed — mention the actual code changes, not just the version bump.`;
 
   const ai = execSync('claude -p', {
     input: prompt,
